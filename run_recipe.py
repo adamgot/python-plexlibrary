@@ -388,7 +388,7 @@ def run_trakt_watched_sort_only(recipe, library_type):
     new_library_key = new_library.key
     all_new_items = new_library.all()
 
-    if recipe.WEIGHTED_SORTING:
+    if not recipe.SORT_TITLE_ABSOLUTE and recipe.WEIGHTED_SORTING:
         if config.TMDB_API_KEY:
             item_list = weighted_sorting(item_list, recipe, library_type)
         else:
@@ -413,18 +413,25 @@ def run_trakt_watched_sort_only(recipe, library_type):
         else:
             imdb_map[m.ratingKey] = m
 
-    # Modify the sort title to match the trakt watched order
+    # Modify the sort titles
     print(u"Setting the sort titles for the '{}' library...".format(
         recipe.NEW_LIBRARY_NAME))
     in_library_idx = []
-    i = 0
-    for m in item_list:
-        item = imdb_map.pop(m['id'], None)
-        if item:
-            i += 1
-            add_sort_title(new_library_key, item.ratingKey, i,
-                           m['title'], library_type)
-            in_library_idx.append(i)
+    if recipe.SORT_TITLE_ABSOLUTE:
+        for i, m in enumerate(item_list):
+            item = imdb_map.pop(m['id'], None)
+            if item:
+                add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], library_type)
+                in_library_idx.append(i)
+    else:
+        i = 0
+        for m in item_list:
+            item = imdb_map.pop(m['id'], None)
+            if item:
+                i += 1
+                add_sort_title(new_library_key, item.ratingKey, i, m['title'], library_type)
+                in_library_idx.append(i)
+
 
 
 def run_trakt_watched(recipe, library_type):
@@ -466,8 +473,8 @@ def run_trakt_watched(recipe, library_type):
 
     def _tv_add_from_trakt_list(url):
         print(u"Retrieving the trakt list: {}".format(url))
-        movie_data = trakt_core._handle_request('get', url)
-        for m in movie_data:
+        show_data = trakt_core._handle_request('get', url)
+        for m in show_data:
             # Skip already added shows
             if m['show']['ids']['imdb'] in item_ids:
                 continue
@@ -556,9 +563,10 @@ def run_trakt_watched(recipe, library_type):
         if not res:
             nonmatching_idx.append(i)
 
-    for i in reversed(nonmatching_idx):
-        del item_list[i]
-        del item_ids[i]
+    if not recipe.SORT_TITLE_ABSOLUTE:
+        for i in reversed(nonmatching_idx):
+            del item_list[i]
+            del item_ids[i]
 
     # Create symlinks for all items in your library on the trakt watched
     print(u"Creating symlinks for {count} matching items in the "
@@ -684,7 +692,7 @@ def run_trakt_watched(recipe, library_type):
         new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
         new_library_key = new_library.key
 
-    if recipe.WEIGHTED_SORTING:
+    if not recipe.SORT_TITLE_ABSOLUTE and recipe.WEIGHTED_SORTING:
         # While we wait for refresh, query TMDb etc.
         if config.TMDB_API_KEY:
             print(u"Getting data from TMDb to add weighted sorting...")
@@ -729,20 +737,21 @@ def run_trakt_watched(recipe, library_type):
     print(u"Setting the sort titles for the '{}' library...".format(
         recipe.NEW_LIBRARY_NAME))
     in_library_idx = []
-    i = 0
-    for m in item_list:
-        item = imdb_map.pop(m['id'], None)
-        if item:
-            i += 1
-            add_sort_title(new_library_key, item.ratingKey, i, m['title'], library_type)
-            in_library_idx.append(i)
+    if recipe.SORT_TITLE_ABSOLUTE:
+        for i, m in enumerate(item_list):
+            item = imdb_map.pop(m['id'], None)
+            if item:
+                add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], library_type)
+                in_library_idx.append(i)
+    else:
+        i = 0
+        for m in item_list:
+            item = imdb_map.pop(m['id'], None)
+            if item:
+                i += 1
+                add_sort_title(new_library_key, item.ratingKey, i, m['title'], library_type)
+                in_library_idx.append(i)
 
-    if not recipe.REMOVE_FROM_LIBRARY or len(all_new_items) < recipe.MAX_COUNT:
-        # TODO
-        while item == imdb_map.pop(m['id'], None):
-            i += 1
-            add_sort_title(new_library_key, item.ratingKey, i, m['title'], library_type)
-            in_library_idx.append(i)
     if recipe.REMOVE_FROM_LIBRARY:
         # Remove items from library with are no longer on the trakt watched list
         print(u"Removing symlinks for items which are not on the trakt watched "
@@ -828,6 +837,13 @@ def run_trakt_watched(recipe, library_type):
             time.sleep(5)
             new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
         new_library.emptyTrash()
+    elif len(all_new_items) < recipe.MAX_COUNT:
+        # TODO
+        while imdb_map:
+            item = imdb_map.pop(m['id'])
+            i += 1
+            add_sort_title(new_library_key, item.ratingKey, i, m['title'], library_type)
+            in_library_idx.append(i)
 
     return len(item_ids)
 
