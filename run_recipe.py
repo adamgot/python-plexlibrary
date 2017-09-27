@@ -587,8 +587,12 @@ def run_recipe(recipe, library_type):
                 matching_total += 1
                 matched = True
         if matched:
-            print(u"{} {} ({})".format(
-                matching_total, item['title'], item['year']))
+            if recipe.SORT_TITLE_ABSOLUTE:
+                print(u"{} {} ({})".format(
+                    i+1, item['title'], item['year']))
+            else:
+                print(u"{} {} ({})".format(
+                    matching_total, item['title'], item['year']))
         if not matched:
             nonmatching_idx.append(i)
             missing_items.append((i, item))
