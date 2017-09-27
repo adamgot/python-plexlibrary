@@ -568,7 +568,7 @@ def run_recipe(recipe, library_type):
     matching_total = 0
     for i, item in enumerate(item_list):
         matched = False
-        if matching_total >= recipe.MAX_COUNT:
+        if recipe.MAX_COUNT > 0 and matching_total >= recipe.MAX_COUNT:
             nonmatching_idx.append(i)
             continue
         for m in matching_items_tmp.get(item['id'], []):
