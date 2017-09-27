@@ -37,7 +37,6 @@ import trakt
 import config
 
 TMDB_REQUEST_COUNT = 0  # DO NOT CHANGE
-TVDB_REQUEST_COUNT = 0  # DO NOT CHANGE
 TVDB_TOKEN = None
 
 
@@ -185,7 +184,6 @@ def get_tmdb_details(tmdb_id, library_type='movie'):
 
 
 def get_imdb_id_from_tvdb(tvdb_id):
-    global TVDB_REQUEST_COUNT
     global TVDB_TOKEN
     # TODO Cache
 
@@ -202,8 +200,6 @@ def get_imdb_id_from_tvdb(tvdb_id):
         url = "https://api.thetvdb.com/login"
         r = requests.post(url, json=data)
 
-        TVDB_REQUEST_COUNT += 1
-
         if r.status_code == 200:
             result = r.json()
             TVDB_TOKEN = result['token']
@@ -212,8 +208,6 @@ def get_imdb_id_from_tvdb(tvdb_id):
 
     url = "https://api.thetvdb.com/series/{id}".format(id=tvdb_id)
     r = requests.get(url, headers={'Authorization': 'Bearer {token}'.format(token=TVDB_TOKEN)})
-
-    TVDB_REQUEST_COUNT += 1
 
     if r.status_code == 200:
         tv_show = r.json()
