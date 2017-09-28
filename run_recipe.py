@@ -868,6 +868,8 @@ def run_recipe(recipe, library_type):
                 imdb_map[imdb_id] = m
             else:
                 imdb_map[m.ratingKey] = m
+        else:
+            imdb_map[m.ratingKey] = m
 
     # Modify the sort titles
     print(u"Setting the sort titles for the '{}' library...".format(
