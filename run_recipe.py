@@ -371,13 +371,37 @@ def run_recipe_sort_only(recipe, library_type):
                 continue
             item_list.append({
                 'id': m['movie']['ids']['imdb'],
-                'tmdb_id': m['movie']['ids']['tmdb'],
-                'title': m['movie']['title'].encode('utf8'),
+                'tmdb_id': m['movie']['ids'].get('tmdb', ''),
+                'title': m['movie']['title'],
                 'year': m['movie']['year'],
             })
             item_ids.append(m['movie']['ids']['imdb'])
-            print(u"{} {} {}".format(
-                len(item_list), m['movie']['title'], m['movie']['year']))
+            if m['movie']['ids'].get('tmdb'):
+                item_ids.append('tmdb' + str(m['movie']['ids']['tmdb']))
+
+    def _tv_add_from_trakt_list(url):
+        print(u"Retrieving the trakt list: {}".format(url))
+        show_data = trakt_core._handle_request('get', url)
+        for m in show_data:
+            # Skip already added shows
+            if m['show']['ids']['imdb'] in item_ids:
+                continue
+            # Skip old shows
+            if recipe.MAX_AGE != 0 \
+                    and (curyear - (recipe.MAX_AGE - 1)) > int(m['show']['year']):
+                continue
+            item_list.append({
+                'id': m['show']['ids']['imdb'],
+                'tmdb_id': m['show']['ids'].get('tmdb', ''),
+                'tvdb_id': m['show']['ids'].get('tvdb', ''),
+                'title': m['show']['title'],
+                'year': m['show']['year'],
+            })
+            item_ids.append(m['show']['ids']['imdb'])
+            if m['show']['ids'].get('tmdb'):
+                item_ids.append('tmdb' + str(m['show']['ids']['tmdb']))
+            if m['show']['ids'].get('tvdb'):
+                item_ids.append('tvdb' + str(m['show']['ids']['tvdb']))
 
     # Get the trakt lists
     if library_type == 'movie':
@@ -389,32 +413,61 @@ def run_recipe_sort_only(recipe, library_type):
 
     if not recipe.SORT_TITLE_ABSOLUTE and recipe.WEIGHTED_SORTING:
         if config.TMDB_API_KEY:
+            print(u"Getting data from TMDb to add weighted sorting...")
             item_list = weighted_sorting(item_list, recipe, library_type)
         else:
-            print(u"TMDd API key is required for weighted sorting")
+            print(u"Warning: TMDd API key is required for weighted sorting")
 
+    try:
+        new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
+        new_library_key = new_library.key
+    except:
+        raise Exception("Library '{library}' does not exist".format(
+            library=recipe.NEW_LIBRARY_NAME))
+
+    new_library.update()
+    # Wait for metadata to finish downloading before continuing
+    print(u"Waiting for metadata to finish downloading...")
     new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
-    new_library_key = new_library.key
+    while new_library.refreshing:
+        time.sleep(5)
+        new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
+
+    # Retrieve a list of items from the new library
+    print(u"Retrieving a list of items from the '{library}' library in "
+          u"Plex...".format(library=recipe.NEW_LIBRARY_NAME))
     all_new_items = new_library.all()
 
     # Create a dictionary of {imdb_id: item}
     imdb_map = {}
     for m in all_new_items:
+        imdb_id = None
+        tmdb_id = None
+        tvdb_id = None
         if m.guid != None and 'imdb://' in m.guid:
             imdb_id = m.guid.split('imdb://')[1].split('?')[0]
         elif m.guid != None and 'themoviedb://' in m.guid:
             tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
-            imdb_id = get_imdb_id_from_tmdb(tmdb_id)
         elif m.guid != None and 'thetvdb://' in m.guid:
             tvdb_id = m.guid.split('thetvdb://')[1].split('?')[0].split('/')[0]
-            imdb_id = get_imdb_id_from_tvdb(tvdb_id)
         else:
             imdb_id = None
 
-        if imdb_id and imdb_id in item_ids:
+        if imdb_id and str(imdb_id) in item_ids:
             imdb_map[imdb_id] = m
+        elif tmdb_id and ('tmdb' + str(tmdb_id)) in item_ids:
+            imdb_map['tmdb' + str(tmdb_id)] = m
+        elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
+            imdb_map['tvdb' + str(tvdb_id)] = m
         else:
-            imdb_map[m.ratingKey] = m
+            if tmdb_id:
+                imdb_id = get_imdb_id_from_tmdb(tmdb_id)
+            elif tvdb_id:
+                imdb_id = get_imdb_id_from_tvdb(tvdb_id)
+            if imdb_id and str(imdb_id) in item_ids:
+                imdb_map[imdb_id] = m
+            else:
+                imdb_map[m.ratingKey] = m
 
     # Modify the sort titles
     print(u"Setting the sort titles for the '{}' library...".format(
@@ -422,16 +475,29 @@ def run_recipe_sort_only(recipe, library_type):
     if recipe.SORT_TITLE_ABSOLUTE:
         for i, m in enumerate(item_list):
             item = imdb_map.pop(m['id'], None)
+            if not item:
+                item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')), None)
+            if not item:
+                item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
             if item:
                 add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], library_type)
     else:
         i = 0
         for m in item_list:
             item = imdb_map.pop(m['id'], None)
+            if not item:
+                item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')), None)
+            if not item:
+                item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
             if item:
                 i += 1
                 add_sort_title(new_library_key, item.ratingKey, i, m['title'], library_type)
+        while imdb_map:
+            imdb_id, item = imdb_map.popitem()
+            i += 1
+            add_sort_title(new_library_key, item.ratingKey, i, item.title, library_type)
 
+    return len(all_new_items)
 
 
 def run_recipe(recipe, library_type):
@@ -511,7 +577,7 @@ def run_recipe(recipe, library_type):
             print(u"Getting data from TMDb to add weighted sorting...")
             item_list = weighted_sorting(item_list, recipe, library_type)
         else:
-            print(u"TMDd API key is required for weighted sorting")
+            print(u"Warning: TMDd API key is required for weighted sorting")
 
     # Get list of items from the Plex server
     print(u"Trying to match with items from the '{library}' library ".format(
@@ -904,7 +970,9 @@ if __name__ == "__main__":
         raise Exception("Library type should be 'movie' or 'tv'")
 
     if '--sort-only' in sys.argv:
-        run_recipe_sort_only(recipe, library_type)
+        list_count = run_recipe_sort_only(recipe, library_type)
+        print(u"Number of items in the new library: {count}".format(
+            count=list_count))
     else:
         missing_items, list_count = run_recipe(recipe, library_type)
         print(u"Number of items in the new library: {count}".format(
