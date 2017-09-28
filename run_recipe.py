@@ -102,11 +102,19 @@ def add_sort_title(library_key, rating_key, number, title, library_type):
 def get_imdb_id_from_tmdb(tmdb_id, library_type='movie'):
     global TMDB_REQUEST_COUNT
 
-    if not config.TMDB_API_KEY:
-        return None
-
     if library_type not in ('movie', 'tv'):
         raise Exception("Library type should be 'movie' or 'tv'")
+
+    # Use cache
+    cache = shelve.open(config.TMDB_CACHE_FILE)
+    if cache.has_key(str(tmdb_id)):
+        item = cache[str(tmdb_id)]
+        cache.close()
+        return item.get('imdb_id')
+
+    if not config.TMDB_API_KEY:
+        cache.close()
+        return None
 
     # Wait 10 seconds for the TMDb rate limit
     if TMDB_REQUEST_COUNT >= 40:
@@ -114,7 +122,9 @@ def get_imdb_id_from_tmdb(tmdb_id, library_type='movie'):
         time.sleep(10)
         TMDB_REQUEST_COUNT = 0
 
-    params = {"api_key": config.TMDB_API_KEY}
+    params = {
+        'api_key': config.TMDB_API_KEY,
+    }
 
     if library_type == 'movie':
         url = "https://api.themoviedb.org/3/movie/{tmdb_id}".format(
@@ -128,8 +138,12 @@ def get_imdb_id_from_tmdb(tmdb_id, library_type='movie'):
 
     if r.status_code == 200:
         item = json.loads(r.text)
+        item['cached'] = int(time.time())
+        cache[str(tmdb_id)] = item
+        cache.close()
         return item.get('imdb_id')
     else:
+        cache.close()
         return None
 
 
