@@ -613,6 +613,8 @@ def run_recipe(recipe, library_type):
         return 0
 
     # Create a list of matching items
+    # Sadly we cannot search for guid,
+    # so we have to loop through the entire library
     matching_items = []
     nonmatching_idx = []
     matching_items_tmp = {}
@@ -805,7 +807,7 @@ def run_recipe(recipe, library_type):
     try:
         new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
         new_library_key = new_library.key
-        print(u"Library already exists in Plex. Refreshing the library...")
+        print(u"Library already exists in Plex. Scanning the library...")
 
         new_library.update()
     except:
@@ -958,8 +960,8 @@ def run_recipe(recipe, library_type):
 
         print(u"Removed symlinks for {count} items.".format(count=count))
 
-        # Refresh the library to clean up the deleted items
-        print(u"Refreshing the '{library}' library...".format(
+        # Scan the library to clean up the deleted items
+        print(u"Scanning the '{library}' library...".format(
             library=recipe.NEW_LIBRARY_NAME))
         new_library.update()
         time.sleep(10)
