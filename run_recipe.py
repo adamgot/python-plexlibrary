@@ -370,6 +370,7 @@ def run_recipe_sort_only(recipe, library_type):
     trakt_core = trakt.core.Core()
     item_list = []
     item_ids = []
+    force_imdb_id_match = False
     curyear = datetime.datetime.now().year
 
     def _movie_add_from_trakt_list(url):
@@ -392,6 +393,8 @@ def run_recipe_sort_only(recipe, library_type):
             item_ids.append(m['movie']['ids']['imdb'])
             if m['movie']['ids'].get('tmdb'):
                 item_ids.append('tmdb' + str(m['movie']['ids']['tmdb']))
+            else:
+                force_imdb_id_match = True
 
     def _tv_add_from_trakt_list(url):
         print(u"Retrieving the trakt list: {}".format(url))
@@ -414,8 +417,12 @@ def run_recipe_sort_only(recipe, library_type):
             item_ids.append(m['show']['ids']['imdb'])
             if m['show']['ids'].get('tmdb'):
                 item_ids.append('tmdb' + str(m['show']['ids']['tmdb']))
+            else:
+                force_imdb_id_match = True
             if m['show']['ids'].get('tvdb'):
                 item_ids.append('tvdb' + str(m['show']['ids']['tvdb']))
+            else:
+                force_imdb_id_match = True
 
     # Get the trakt lists
     if library_type == 'movie':
@@ -473,7 +480,8 @@ def run_recipe_sort_only(recipe, library_type):
             imdb_map['tmdb' + str(tmdb_id)] = m
         elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
             imdb_map['tvdb' + str(tvdb_id)] = m
-        else:
+        elif force_imdb_id_match:
+            # Only IMDB ID found for some items
             if tmdb_id:
                 imdb_id = get_imdb_id_from_tmdb(tmdb_id)
             elif tvdb_id:
