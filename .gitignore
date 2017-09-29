@@ -10,4 +10,5 @@ syntax: glob
 *__pycache__*
 .cache/
 config.py
+config.yml
 recipes/*
