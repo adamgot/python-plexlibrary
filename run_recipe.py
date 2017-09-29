@@ -822,8 +822,6 @@ def run_recipe(recipe, library_type):
         time.sleep(5)
         new_library = plex.library.section(recipe.NEW_LIBRARY_NAME)
 
-    #time.sleep(5)
-
     # Retrieve a list of items from the new library
     print(u"Retrieving a list of items from the '{library}' library in "
           u"Plex...".format(library=recipe.NEW_LIBRARY_NAME))
