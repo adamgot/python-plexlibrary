@@ -212,8 +212,6 @@ def get_imdb_id_from_tvdb(tvdb_id):
         return None
 
 
-
-
 class Recipe(object):
     def __init__(self, recipe_name, sory_only=False):
         self.recipe_name = recipe_name
@@ -241,11 +239,7 @@ class Recipe(object):
             raise Exception("No Plex server found at: {base_url}".format(
                 base_url=self.config['plex']['baseurl']))
 
-        self.trakt.init(config.TRAKT_USERNAME, client_id=config.TRAKT_CLIENT_ID,
-                   client_secret=config.TRAKT_CLIENT_SECRET)
-        self.trakt_core = trakt.core.Core()
-
-    def weighted_sorting(item_list, recipe, library_type):
+    def weighted_sorting(self, item_list, recipe, library_type):
         def _get_non_theatrical_release(release_dates):
             # Returns earliest release date that is not theatrical
             # TODO PREDB
