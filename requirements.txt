@@ -2,3 +2,4 @@
 plexapi
 requests
 trakt
+pyyaml
