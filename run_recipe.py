@@ -549,7 +549,6 @@ def run_recipe(recipe, library_type):
     trakt_core = trakt.core.Core()
     item_list = []
     item_ids = []
-    missing_items = []
     force_imdb_id_match = False
     curyear = datetime.datetime.now().year
 
@@ -624,7 +623,6 @@ def run_recipe(recipe, library_type):
         library=recipe.SOURCE_LIBRARY_NAME))
     try:
         source_library = plex.library.section(recipe.SOURCE_LIBRARY_NAME)
-        all_items = source_library.all()
     except:
         print(u"The '{library}' library does not exist in Plex.".format(
             library=recipe.SOURCE_LIBRARY_NAME))
@@ -632,80 +630,57 @@ def run_recipe(recipe, library_type):
         return 0
 
     # Create a list of matching items
-    # Sadly we cannot search for guid,
-    # so we have to loop through the entire library
-    # TODO Cache and only recently added?
     matching_items = []
-    nonmatching_idx = []
-    matching_items_tmp = {}
-    for m in all_items:
-        imdb_id = None
-        tmdb_id = None
-        tvdb_id = None
-        if m.guid != None and 'imdb://' in m.guid:
-            imdb_id = m.guid.split('imdb://')[1].split('?')[0]
-        elif m.guid != None and 'themoviedb://' in m.guid:
-            tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
-        elif m.guid != None and 'thetvdb://' in m.guid:
-            tvdb_id = m.guid.split('thetvdb://')[1].split('?')[0].split('/')[0]
-
-        if imdb_id and str(imdb_id) in item_ids:
-            if not matching_items_tmp.get(imdb_id):
-                matching_items_tmp[imdb_id] = []
-            matching_items_tmp[imdb_id].append(m)
-
-        elif tmdb_id and ('tmdb' + str(tmdb_id)) in item_ids:
-            if not matching_items_tmp.get(tmdb_id):
-                matching_items_tmp['tmdb' + str(tmdb_id)] = []
-            matching_items_tmp['tmdb' + str(tmdb_id)].append(m)
-
-        elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
-            if not matching_items_tmp.get(imdb_id):
-                matching_items_tmp['tvdb' + str(tvdb_id)] = []
-            matching_items_tmp['tvdb' + str(tvdb_id)].append(m)
-
-        elif force_imdb_id_match:
-            # Only IMDB ID found for some items
-            if tmdb_id:
-                imdb_id = get_imdb_id_from_tmdb(tmdb_id)
-            elif tvdb_id:
-                imdb_id = get_imdb_id_from_tvdb(tvdb_id)
-            if imdb_id and str(imdb_id) in item_ids:
-                if not matching_items_tmp.get(imdb_id):
-                    matching_items_tmp[imdb_id] = []
-                matching_items_tmp[imdb_id].append(m)
-
+    missing_items = []
     matching_total = 0
+    nonmatching_idx = []
+
     for i, item in enumerate(item_list):
-        matched = False
+        match = False
         if recipe.MAX_COUNT > 0 and matching_total >= recipe.MAX_COUNT:
             nonmatching_idx.append(i)
             continue
-        for m in matching_items_tmp.get(item['id'], []):
-            matching_items.append(m)
-            if not matched:
-                matching_total += 1
-                matched = True
-        for m in matching_items_tmp.get('tmdb' + str(item.get('tmdb_id', '')), []):
-            matching_items.append(m)
-            if not matched:
-                matching_total += 1
-                matched = True
-        for m in matching_items_tmp.get('tvdb' + str(item.get('tvdb_id', '')), []):
-            matching_items.append(m)
-            if not matched:
-                matching_total += 1
-                matched = True
-        if matched:
+        res = source_library.search(guid='imdb://' + str(item['id']))
+        if not res and item.get('tmdb_id'):
+            res = source_library.search(
+                guid='themoviedb://' + str(item['tmdb_id']))
+        if not res and item.get('tvdb_id'):
+            res = source_library.search(
+                guid='thetvdb://' + str(item['tvdb_id']))
+        if not res:
+            missing_items.append((i, item))
+            nonmatching_idx.append(i)
+            continue
+
+        for r in res:
+            imdb_id = None
+            tmdb_id = None
+            tvdb_id = None
+            if r.guid != None and 'imdb://' in r.guid:
+                imdb_id = r.guid.split('imdb://')[1].split('?')[0]
+            elif r.guid != None and 'themoviedb://' in r.guid:
+                tmdb_id = r.guid.split('themoviedb://')[1].split('?')[0]
+            elif r.guid != None and 'thetvdb://' in r.guid:
+                tvdb_id = r.guid.split('thetvdb://')[1].split('?')[0].split('/')[0]
+
+            if ((imdb_id and imdb_id == str(item['id']))
+                    or (tmdb_id and tmdb_id == str(item['tmdb_id']))
+                    or (tvdb_id and tvdb_id == str(item['tvdb_id']))):
+                if not match:
+                    match = True
+                    matching_total += 1
+                matching_items.append(r)
+
+        if match:
             if recipe.SORT_TITLE_ABSOLUTE:
                 print(u"{} {} ({})".format(
                     i+1, item['title'], item['year']))
             else:
                 print(u"{} {} ({})".format(
                     matching_total, item['title'], item['year']))
-        if not matched:
-            nonmatching_idx.append(i)
+        else:
             missing_items.append((i, item))
+            nonmatching_idx.append(i)
 
     if not recipe.SORT_TITLE_ABSOLUTE:
         for i in reversed(nonmatching_idx):
