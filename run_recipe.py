@@ -688,7 +688,7 @@ def run_recipe(recipe, library_type):
 
     # Create symlinks for all items in your library on the trakt watched
     print(u"Creating symlinks for {count} matching items in the "
-          u"library...".format(count=len(matching_items)))
+          u"library...".format(count=matching_total))
 
     try:
         if not os.path.exists(recipe.NEW_LIBRARY_FOLDER):
