@@ -1,29 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Automated Plex library script
-
-Usage:
-    # FIXME
-
-Requirements:
-    requests
-    plexapi
-    trakt
-
-Disclaimer:
-    Use at your own risk! I am not responsible for damages to your Plex server or libraries.
-
-Author:
-    /u/haeri
-
-Credit:
-    Originally based on https://gist.github.com/JonnyWong16/f5b9af386ea58e19bf18c09f2681df23
-    by /u/SwiftPanda16
+"""recipe
 """
 
+import importlib
 import sys
 import os
-import importlib
 import json
 import subprocess
 import time
@@ -31,11 +13,10 @@ import datetime
 import shelve
 import random
 
+import plexapi.server
 import requests
-from plexapi.server import PlexServer
 import trakt
-
-import config
+import yaml
 
 TMDB_REQUEST_COUNT = 0  # DO NOT CHANGE
 TVDB_TOKEN = None
@@ -231,138 +212,6 @@ def get_imdb_id_from_tvdb(tvdb_id):
         return None
 
 
-def weighted_sorting(item_list, recipe, library_type):
-    def _get_non_theatrical_release(release_dates):
-        # Returns earliest release date that is not theatrical
-        # TODO PREDB
-        types = {}
-        for country in release_dates.get('results', []):
-            # FIXME Look at others too?
-            if country['iso_3166_1'] != 'US':
-                continue
-            for d in country['release_dates']:
-                if d['type'] in (4, 5, 6):
-                    # 4: Digital, 5: Physical, 6: TV
-                    types[str(d['type'])] = datetime.datetime.strptime(
-                        d['release_date'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
-            break
-
-        release_date = None
-        for t, d in types.items():
-            if not release_date or d < release_date:
-                release_date = d
-
-        return release_date
-
-    def _get_age_weight(days):
-        if library_type == 'movie':
-            # Everything younger than this will get 1
-            min_days = 100
-            # Everything older than this will get 0
-            max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 200
-        else:
-            min_days = 14
-            max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 100
-        if days <= min_days:
-            return 1
-        elif days >= max_days:
-            return 0
-        else:
-            return 1 - (days - min_days) / (max_days - min_days)
-
-    total_items = len(item_list)
-
-    # TMDB details
-    today = datetime.date.today()
-    total_tmdb_vote = 0.0
-    tmdb_votes = []
-    for i, m in enumerate(item_list):
-        m['original_idx'] = i + 1
-        details = get_tmdb_details(m['tmdb_id'], library_type)
-        if not details:
-            print(u"Warning: No TMDb data for {}".format(m['title']))
-            continue
-        m['tmdb_popularity'] = float(details['popularity'])
-        m['tmdb_vote'] = float(details['vote_average'])
-        m['tmdb_vote_count'] = int(details['vote_count'])
-        if library_type == 'movie':
-            if recipe.BETTER_RELEASE_DATE:
-                m['release_date'] = _get_non_theatrical_release(
-                    details['release_dates']) or \
-                    datetime.datetime.strptime(details['release_date'],
-                    '%Y-%m-%d').date()
-            else:
-                m['release_date'] = datetime.datetime.strptime(
-                    details['release_date'], '%Y-%m-%d').date()
-            item_age_td = today - m['release_date']
-        elif library_type == 'tv':
-            m['last_air_date'] = datetime.datetime.strptime(
-                details['last_air_date'], '%Y-%m-%d').date()
-            item_age_td = today - m['last_air_date']
-        m['genres'] = [g['name'].lower() for g in details['genres']]
-        m['age'] = item_age_td.days
-        if library_type == 'tv' or m['tmdb_vote_count'] > 150 or m['age'] > 50:
-            tmdb_votes.append(m['tmdb_vote'])
-        total_tmdb_vote += m['tmdb_vote']
-        item_list[i] = m
-    average_tmdb_vote = total_tmdb_vote / float(total_items)
-
-    tmdb_votes.sort()
-
-    for i, m in enumerate(item_list):
-        # Distribute all weights evenly from 0 to 1 (times global factor)
-        # More weight means it'll go higher in the final list
-        index_weight = float(total_items - i) / float(total_items)
-        m['index_weight'] = index_weight * recipe.WEIGHT_INDEX
-        if m.get('tmdb_popularity'):
-            if library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
-                vote_weight = (tmdb_votes.index(m['tmdb_vote']) + 1) / float(len(tmdb_votes))
-            else:
-                # Assume below average rating for new/less voted items
-                vote_weight = 0.25
-            age_weight = _get_age_weight(float(m['age']))
-
-            if hasattr(recipe, 'WEIGHT_RANDOM'):
-                random_weight = random.random()
-                m['random_weight'] = random_weight * recipe.WEIGHT_RANDOM
-            else:
-                m['random_weight'] = 0.0
-
-            m['vote_weight'] = vote_weight * recipe.WEIGHT_VOTE
-            m['age_weight'] = age_weight * recipe.WEIGHT_AGE
-
-            weight = (m['index_weight'] + m['vote_weight']
-                      + m['age_weight'] + m['random_weight'])
-            for genre, value in recipe.WEIGHT_GENRE_BIAS.items():
-                if genre.lower() in m['genres']:
-                    weight *= value
-
-            m['weight'] = weight
-        else:
-            m['vote_weight'] = 0.0
-            m['age_weight'] = 0.0
-            m['weight'] = index_weight
-        item_list[i] = m
-
-    item_list.sort(key = lambda m: m['weight'], reverse=True)
-
-    for i, m in enumerate(item_list):
-        if (i+1) < m['original_idx']:
-            net = Colors.GREEN + u'↑'
-        elif (i+1) > m['original_idx']:
-            net = Colors.RED + u'↓'
-        else:
-            net = u' '
-        net += str(abs(i + 1 - m['original_idx'])).rjust(3)
-        print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
-            "age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
-            "{}{}".format(
-                net, i+1, m['original_idx'], round(m['index_weight'], 3),
-                m.get('tmdb_vote'), round(m['vote_weight'], 3), m.get('age'),
-                round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
-                round(m['weight'], 3), m['title'], m['year'], Colors.RESET))
-
-    return item_list
 
 
 class Recipe(object):
@@ -376,6 +225,9 @@ class Recipe(object):
         self.recipe = importlib.import_module('recipes.' + recipe_name)
         sys.path.remove(parent_dir)
 
+        with open(os.path.join(parent_dir, 'config.yml'), 'r') as ymlfile:
+            self.config = yaml.load(ymlfile)
+
         if self.recipe.LIBRARY_TYPE.lower().startswith('movie'):
             self.library_type = 'movie'
         elif self.recipe.LIBRARY_TYPE.lower().startswith('tv'):
@@ -384,14 +236,147 @@ class Recipe(object):
             raise Exception("Library type should be 'movie' or 'tv'")
 
         try:
-            self.plex = PlexServer(config.PLEX_URL, config.PLEX_TOKEN)
+            self.plex = plexapi.server.PlexServer(**self.config['plex'])
         except:
             raise Exception("No Plex server found at: {base_url}".format(
-                base_url=config.PLEX_URL))
+                base_url=self.config['plex']['baseurl']))
 
         self.trakt.init(config.TRAKT_USERNAME, client_id=config.TRAKT_CLIENT_ID,
                    client_secret=config.TRAKT_CLIENT_SECRET)
         self.trakt_core = trakt.core.Core()
+
+    def weighted_sorting(item_list, recipe, library_type):
+        def _get_non_theatrical_release(release_dates):
+            # Returns earliest release date that is not theatrical
+            # TODO PREDB
+            types = {}
+            for country in release_dates.get('results', []):
+                # FIXME Look at others too?
+                if country['iso_3166_1'] != 'US':
+                    continue
+                for d in country['release_dates']:
+                    if d['type'] in (4, 5, 6):
+                        # 4: Digital, 5: Physical, 6: TV
+                        types[str(d['type'])] = datetime.datetime.strptime(
+                            d['release_date'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                break
+
+            release_date = None
+            for t, d in types.items():
+                if not release_date or d < release_date:
+                    release_date = d
+
+            return release_date
+
+        def _get_age_weight(days):
+            if library_type == 'movie':
+                # Everything younger than this will get 1
+                min_days = 100
+                # Everything older than this will get 0
+                max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 200
+            else:
+                min_days = 14
+                max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 100
+            if days <= min_days:
+                return 1
+            elif days >= max_days:
+                return 0
+            else:
+                return 1 - (days - min_days) / (max_days - min_days)
+
+        total_items = len(item_list)
+
+        # TMDB details
+        today = datetime.date.today()
+        total_tmdb_vote = 0.0
+        tmdb_votes = []
+        for i, m in enumerate(item_list):
+            m['original_idx'] = i + 1
+            details = get_tmdb_details(m['tmdb_id'], library_type)
+            if not details:
+                print(u"Warning: No TMDb data for {}".format(m['title']))
+                continue
+            m['tmdb_popularity'] = float(details['popularity'])
+            m['tmdb_vote'] = float(details['vote_average'])
+            m['tmdb_vote_count'] = int(details['vote_count'])
+            if library_type == 'movie':
+                if recipe.BETTER_RELEASE_DATE:
+                    m['release_date'] = _get_non_theatrical_release(
+                        details['release_dates']) or \
+                        datetime.datetime.strptime(details['release_date'],
+                        '%Y-%m-%d').date()
+                else:
+                    m['release_date'] = datetime.datetime.strptime(
+                        details['release_date'], '%Y-%m-%d').date()
+                item_age_td = today - m['release_date']
+            elif library_type == 'tv':
+                m['last_air_date'] = datetime.datetime.strptime(
+                    details['last_air_date'], '%Y-%m-%d').date()
+                item_age_td = today - m['last_air_date']
+            m['genres'] = [g['name'].lower() for g in details['genres']]
+            m['age'] = item_age_td.days
+            if library_type == 'tv' or m['tmdb_vote_count'] > 150 or m['age'] > 50:
+                tmdb_votes.append(m['tmdb_vote'])
+            total_tmdb_vote += m['tmdb_vote']
+            item_list[i] = m
+        average_tmdb_vote = total_tmdb_vote / float(total_items)
+
+        tmdb_votes.sort()
+
+        for i, m in enumerate(item_list):
+            # Distribute all weights evenly from 0 to 1 (times global factor)
+            # More weight means it'll go higher in the final list
+            index_weight = float(total_items - i) / float(total_items)
+            m['index_weight'] = index_weight * recipe.WEIGHT_INDEX
+            if m.get('tmdb_popularity'):
+                if library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
+                    vote_weight = (tmdb_votes.index(m['tmdb_vote']) + 1) / float(len(tmdb_votes))
+                else:
+                    # Assume below average rating for new/less voted items
+                    vote_weight = 0.25
+                age_weight = _get_age_weight(float(m['age']))
+
+                if hasattr(recipe, 'WEIGHT_RANDOM'):
+                    random_weight = random.random()
+                    m['random_weight'] = random_weight * recipe.WEIGHT_RANDOM
+                else:
+                    m['random_weight'] = 0.0
+
+                m['vote_weight'] = vote_weight * recipe.WEIGHT_VOTE
+                m['age_weight'] = age_weight * recipe.WEIGHT_AGE
+
+                weight = (m['index_weight'] + m['vote_weight']
+                          + m['age_weight'] + m['random_weight'])
+                for genre, value in recipe.WEIGHT_GENRE_BIAS.items():
+                    if genre.lower() in m['genres']:
+                        weight *= value
+
+                m['weight'] = weight
+            else:
+                m['vote_weight'] = 0.0
+                m['age_weight'] = 0.0
+                m['weight'] = index_weight
+            item_list[i] = m
+
+        item_list.sort(key = lambda m: m['weight'], reverse=True)
+
+        for i, m in enumerate(item_list):
+            if (i+1) < m['original_idx']:
+                net = Colors.GREEN + u'↑'
+            elif (i+1) > m['original_idx']:
+                net = Colors.RED + u'↓'
+            else:
+                net = u' '
+            net += str(abs(i + 1 - m['original_idx'])).rjust(3)
+            print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
+                "age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
+                "{}{}".format(
+                    net, i+1, m['original_idx'], round(m['index_weight'], 3),
+                    m.get('tmdb_vote'), round(m['vote_weight'], 3), m.get('age'),
+                    round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
+                    round(m['weight'], 3), m['title'], m['year'], Colors.RESET))
+
+        return item_list
 
     def _run(self):
         item_list = []
@@ -469,7 +454,7 @@ class Recipe(object):
         print(u"Trying to match with items from the '{library}' library ".format(
             library=self.recipe.SOURCE_LIBRARY_NAME))
         try:
-            source_library = plex.library.section(self.recipe.SOURCE_LIBRARY_NAME)
+            source_library = self.plex.library.section(self.recipe.SOURCE_LIBRARY_NAME)
         except:
             print(u"The '{library}' library does not exist in Plex.".format(
                 library=self.recipe.SOURCE_LIBRARY_NAME))
@@ -652,22 +637,22 @@ class Recipe(object):
         print(u"Creating the '{}' library in Plex...".format(
             self.recipe.NEW_LIBRARY_NAME))
         try:
-            new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+            new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
             new_library_key = new_library.key
             print(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
         except:
             create_new_library(self.recipe.NEW_LIBRARY_NAME, self.recipe.NEW_LIBRARY_FOLDER, self.library_type)
-            new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+            new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
             new_library_key = new_library.key
 
         # Wait for metadata to finish downloading before continuing
         print(u"Waiting for metadata to finish downloading...")
-        new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+        new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
         while new_library.refreshing:
             time.sleep(5)
-            new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+            new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
 
         # Retrieve a list of items from the new library
         print(u"Retrieving a list of items from the '{library}' library in "
@@ -817,10 +802,10 @@ class Recipe(object):
                 library=self.recipe.NEW_LIBRARY_NAME))
             new_library.update()
             time.sleep(10)
-            new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+            new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
             while new_library.refreshing:
                 time.sleep(5)
-                new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+                new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
             new_library.emptyTrash()
             all_new_items = new_library.all()
         else:
@@ -832,16 +817,6 @@ class Recipe(object):
         return missing_items, len(all_new_items)
 
     def _run_sort_only(self):
-        try:
-            plex = PlexServer(config.PLEX_URL, config.PLEX_TOKEN)
-        except:
-            print(u"No Plex server found at: {base_url}".format(base_url=config.PLEX_URL))
-            print(u"Exiting script.")
-            return 0
-
-        if self.library_type not in ('movie', 'tv'):
-            raise Exception("Library type should be 'movie' or 'tv'")
-
         item_list = []
         item_ids = []
         force_imdb_id_match = False
@@ -914,7 +889,7 @@ class Recipe(object):
                 print(u"Warning: TMDd API key is required for weighted sorting")
 
         try:
-            new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+            new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
             new_library_key = new_library.key
         except:
             raise Exception("Library '{library}' does not exist".format(
@@ -923,10 +898,10 @@ class Recipe(object):
         new_library.update()
         # Wait for metadata to finish downloading before continuing
         print(u"Waiting for metadata to finish downloading...")
-        new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+        new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
         while new_library.refreshing:
             time.sleep(5)
-            new_library = plex.library.section(self.recipe.NEW_LIBRARY_NAME)
+            new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
 
         # Retrieve a list of items from the new library
         print(u"Retrieving a list of items from the '{library}' library in "
