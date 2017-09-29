@@ -1,0 +1,13 @@
+syntax: glob
+*.db
+*.egg-info
+*.log
+*.orig
+*.pickle
+*.pyc
+*.sublime-*
+*.swp
+*__pycache__*
+.cache/
+config.py
+recipes/*
