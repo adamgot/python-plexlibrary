@@ -29,6 +29,7 @@ import subprocess
 import time
 import datetime
 import shelve
+import random
 
 import requests
 from plexapi.server import PlexServer
@@ -233,6 +234,7 @@ def get_imdb_id_from_tvdb(tvdb_id):
 def weighted_sorting(item_list, recipe, library_type):
     def _get_non_theatrical_release(release_dates):
         # Returns earliest release date that is not theatrical
+        # TODO PREDB
         types = {}
         for country in release_dates.get('results', []):
             # FIXME Look at others too?
@@ -311,7 +313,7 @@ def weighted_sorting(item_list, recipe, library_type):
         # Distribute all weights evenly from 0 to 1 (times global factor)
         # More weight means it'll go higher in the final list
         index_weight = float(total_items - i) / float(total_items)
-        m['index_weight'] = index_weight
+        m['index_weight'] = index_weight * recipe.WEIGHT_INDEX
         if m.get('tmdb_popularity'):
             if library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
                 vote_weight = (tmdb_votes.index(m['tmdb_vote']) + 1) / float(len(tmdb_votes))
@@ -319,14 +321,22 @@ def weighted_sorting(item_list, recipe, library_type):
                 # Assume below average rating for new/less voted items
                 vote_weight = 0.25
             age_weight = _get_age_weight(float(m['age']))
-            weight = (index_weight * recipe.WEIGHT_TRAKT_TREND
-                      + vote_weight * recipe.WEIGHT_VOTE
-                      + age_weight * recipe.WEIGHT_AGE)
+
+            if hasattr(recipe, 'WEIGHT_RANDOM'):
+                random_weight = random.random()
+                m['random_weight'] = random_weight * recipe.WEIGHT_RANDOM
+            else:
+                m['random_weight'] = 0.0
+
+            m['vote_weight'] = vote_weight * recipe.WEIGHT_VOTE
+            m['age_weight'] = age_weight * recipe.WEIGHT_AGE
+
+            weight = (m['index_weight'] + m['vote_weight']
+                      + m['age_weight'] + m['random_weight'])
             for genre, value in recipe.WEIGHT_GENRE_BIAS.items():
                 if genre.lower() in m['genres']:
                     weight *= value
-            m['vote_weight'] = vote_weight
-            m['age_weight'] = age_weight
+
             m['weight'] = weight
         else:
             m['vote_weight'] = 0.0
@@ -345,11 +355,12 @@ def weighted_sorting(item_list, recipe, library_type):
             net = u' '
         net += str(abs(i + 1 - m['original_idx'])).rjust(3)
         print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
-            "age:{:>4}, w_age:{:0<5}; w_cmb:{:0<5}; {} {}{}".format(
+            "age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
+            "{}{}".format(
                 net, i+1, m['original_idx'], round(m['index_weight'], 3),
                 m.get('tmdb_vote'), round(m['vote_weight'], 3), m.get('age'),
-                round(m['age_weight'], 3), round(m['weight'], 3),
-                m['title'].encode('utf8'), m['year'], Colors.RESET))
+                round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
+                round(m['weight'], 3), m['title'], m['year'], Colors.RESET))
 
     return item_list
 
@@ -432,7 +443,7 @@ def run_recipe_sort_only(recipe, library_type):
         for url in recipe.SOURCE_LIST_URLS:
             _tv_add_from_trakt_list(url)
 
-    if not recipe.SORT_TITLE_ABSOLUTE and recipe.WEIGHTED_SORTING:
+    if recipe.WEIGHTED_SORTING:
         if config.TMDB_API_KEY:
             print(u"Getting data from TMDb to add weighted sorting...")
             item_list = weighted_sorting(item_list, recipe, library_type)
@@ -601,7 +612,7 @@ def run_recipe(recipe, library_type):
         for url in recipe.SOURCE_LIST_URLS:
             _tv_add_from_trakt_list(url)
 
-    if not recipe.SORT_TITLE_ABSOLUTE and recipe.WEIGHTED_SORTING:
+    if recipe.WEIGHTED_SORTING:
         if config.TMDB_API_KEY:
             print(u"Getting data from TMDb to add weighted sorting...")
             item_list = weighted_sorting(item_list, recipe, library_type)
@@ -623,6 +634,7 @@ def run_recipe(recipe, library_type):
     # Create a list of matching items
     # Sadly we cannot search for guid,
     # so we have to loop through the entire library
+    # TODO Cache and only recently added?
     matching_items = []
     nonmatching_idx = []
     matching_items_tmp = {}
@@ -714,9 +726,10 @@ def run_recipe(recipe, library_type):
 
     count = 0
     updated_paths = []
+    new_items = []
     if library_type == 'movie':
-        for item in matching_items:
-            for part in item.iterParts():
+        for movie in matching_items:
+            for part in movie.iterParts():
                 old_path_file = part.file.encode('UTF-8')
                 old_path, file_name = os.path.split(old_path_file)
 
@@ -762,6 +775,7 @@ def run_recipe(recipe, library_type):
                             else:
                                 os.symlink(old_path_file, new_path)
                         count += 1
+                        new_items.append(movie)
                         updated_paths.append(new_path)
                     except Exception as e:
                         print(u"Symlink failed for {path}: {e}".format(
@@ -802,12 +816,15 @@ def run_recipe(recipe, library_type):
                                 else:
                                     os.symlink(old_path_file, new_path)
                             count += 1
+                            new_items.append(tv_show)
                             updated_paths.append(new_path)
                             done = True
                         except Exception as e:
                             print(u"Symlink failed for {path}: {e}".format(path=new_path, e=e))
 
-    print(u"Created symlinks for {count} items.".format(count=count))
+    print(u"Created symlinks for {count} new items:".format(count=count))
+    for item in new_items:
+        print(u"{title} ({year})".format(title=item.title, year=item.year))
 
     # Check if the new library exists in Plex
     print(u"Creating the '{}' library in Plex...".format(
@@ -901,6 +918,7 @@ def run_recipe(recipe, library_type):
             library=recipe.NEW_LIBRARY_NAME))
         count = 0
         updated_paths = []
+        deleted_items = []
         if library_type == 'movie':
             for movie in imdb_map.values():
                 for part in movie.iterParts():
@@ -927,6 +945,7 @@ def run_recipe(recipe, library_type):
                             else:
                                 os.unlink(new_path)
                             count += 1
+                            deleted_items.append(movie)
                             updated_paths.append(new_path)
                         except Exception as e:
                             print(u"Remove symlink failed for {path}: {e}".format(
@@ -964,11 +983,14 @@ def run_recipe(recipe, library_type):
                                 else:
                                     os.unlink(new_path)
                                 count += 1
+                                deleted_items.append(tv_show)
                                 updated_paths.append(new_path)
                             except Exception as e:
                                 print(u"Remove symlink failed for {path}: {e}".format(path=new_path, e=e))
 
         print(u"Removed symlinks for {count} items.".format(count=count))
+        for item in deleted_items:
+            print(u"{title} ({year})".format(title=item.title, year=item.year))
 
         # Scan the library to clean up the deleted items
         print(u"Scanning the '{library}' library...".format(
@@ -1005,18 +1027,22 @@ if __name__ == "__main__":
         raise Exception("Library type should be 'movie' or 'tv'")
 
     if '--sort-only' in sys.argv:
+        print(u"Running the recipe '{}', sorting only".format(
+            recipe_name.strip('.py')))
         list_count = run_recipe_sort_only(recipe, library_type)
         print(u"Number of items in the new library: {count}".format(
             count=list_count))
     else:
+        print(u"Running the recipe '{}'".format(recipe_name.strip('.py')))
         missing_items, list_count = run_recipe(recipe, library_type)
         print(u"Number of items in the new library: {count}".format(
             count=list_count))
         print(u"Number of missing items: {count}".format(
             count=len(missing_items)))
         for idx, item in missing_items:
-            print(u"{idx}\t{title} ({year})".format(
-                idx=idx+1, title=item['title'], year=item['year']))
+            print(u"{idx}\t{release}\t{imdb_id}\t{title} ({year})".format(
+                idx=idx+1, release=item.get('release_date', ''),
+                imdb_id=item['id'], title=item['title'], year=item['year']))
 
     print(u"Done!")
 
