@@ -8,7 +8,7 @@ from utils import YAMLBase
 class RecipeParser(YAMLBase):
     def __init__(self, name, directory=None):
         self.name = name.strip('.yml')
-        recipe_file = self.name + '.yml'
+        recipe_file = self.name + '.yml'  # TODO support .yaml
         # FIXME?
         if not directory:
             parent_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__),
@@ -19,7 +19,7 @@ class RecipeParser(YAMLBase):
 
         super(RecipeParser, self).__init__(filepath)
 
-    def print(self):
+    def dump(self):
         print(self.data)
 
 
