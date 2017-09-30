@@ -18,7 +18,14 @@ Credit:
 import argparse
 import sys
 
+import recipes
 from recipe import Recipe
+
+
+def list_recipes(directory=None):
+    print("Available recipes:")
+    for name in recipes.get_recipes(directory):
+        print("    {}".format(name))
 
 
 def main():
@@ -26,9 +33,13 @@ def main():
         prog='plexlibrary',
         description=("This utility creates or maintains a Plex library "
                      "based on a configuration recipe."),
-        usage='%(prog)s <recipe> [options]',
+        usage='%(prog)s [options] [<recipe>]',
     )
-    parser.add_argument('recipe', help='Create a library using this recipe')
+    parser.add_argument('recipe', nargs='?',
+                        help='Create a library using this recipe')
+    parser.add_argument(
+        '-l', '--list-recipes', action='store_true',
+        help='list available recipes')
     parser.add_argument(
         '-s', '--sort-only', action='store_true', help='only sort the library')
 
@@ -37,8 +48,19 @@ def main():
         sys.exit(1)
 
     args = parser.parse_args()
+    if args.list_recipes:
+        list_recipes()
+        sys.exit(0)
+
+    if not args.recipe in recipes.get_recipes():
+        print("Error: No such recipe")
+        list_recipes()
+        sys.exit(1)
+
     r = Recipe(args.recipe)
     r.run(args.sort_only)
+
+    print("Done!")
 
 if __name__ == "__main__":
     main()
