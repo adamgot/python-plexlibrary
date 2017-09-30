@@ -10,7 +10,7 @@ class Trakt(object):
         self.trakt = trakt
         self.trakt_core = trakt.core.Core()
 
-    def add_movies(url, movie_list=None, movie_ids=None, max_age=0):
+    def add_movies(self, url, movie_list=None, movie_ids=None, max_age=0):
         if not movie_list:
             movie_list = []
         if not movie_ids:
@@ -40,7 +40,7 @@ class Trakt(object):
 
         return (movie_list, movie_ids)
 
-    def add_shows(url, show_list=None, show_ids=None, max_age=0):
+    def add_shows(self, url, show_list=None, show_ids=None, max_age=0):
         if not show_list:
             show_list = []
         if not show_ids:
@@ -75,7 +75,7 @@ class Trakt(object):
 
         return (show_list, show_ids)
 
-    def add_items(item_type, url, item_list=None, item_ids=None, max_age=0):
+    def add_items(self, item_type, url, item_list=None, item_ids=None, max_age=0):
         if item_type == 'movie':
             return self.add_movies(url, movie_list=item_list,
                                    movie_ids=item_ids, max_age=max_age)
