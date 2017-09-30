@@ -3,21 +3,14 @@
 """
 
 import datetime
-import importlib
-import json
 import os
 import random
-import shelve
 import subprocess
-import sys
 import time
-
-import plexapi.server
-import requests
-import yaml
 
 import plexutils
 import tmdb
+import traktutils
 import tvdb
 from config import ConfigParser
 from recipes import RecipeParser
@@ -27,6 +20,8 @@ from utils import Colors
 class Recipe(object):
     plex = None
     trakt = None
+    tmdb = None
+    tvdb = None
 
     def __init__(self, recipe_name, sort_only=False, config_file=None):
         self.recipe_name = recipe_name
@@ -44,17 +39,24 @@ class Recipe(object):
         # TODO: Support multiple libraries
         self.source_library_config = self.recipe['source_librares'][0]
 
-        try:
-            self.plex = plexapi.server.PlexServer(**self.config['plex'])
-        except:
-            raise Exception("No Plex server found at: {base_url}".format(
-                base_url=self.config['plex']['baseurl']))
+        self.plex = plexutils.Plex(self.config['plex']['baseurl'],
+                                   self.config['plex']['token'])
 
         if self.config['trakt']['username']:
             self.trakt = traktutils.Trakt(
                 self.config['trakt']['username'],
-                client_id=config['trakt']['client_id'],
-                client_secret=config['trakt']['client_secret'])
+                client_id=self.config['trakt']['client_id'],
+                client_secret=self.config['trakt']['client_secret'])
+
+        if self.config['tmdb']['api_key']:
+            self.tmdb = tmdb.TMDb(
+                self.config['tmdb']['api_key'],
+                cache_file=self.config['tmdb']['cache_file'])
+
+        if self.config['tvdb']['username']:
+            self.tvdb = tvdb.TheTVDB(self.config['tvdb']['username'],
+                                     self.config['tvdb']['api_key'],
+                                     self.config['tvdb']['user_key'])
 
     def _run(self):
         item_list = []
@@ -69,7 +71,7 @@ class Recipe(object):
                     self.recipe['new_library']['max_age'] or 0)
             else:
                 raise Exception("Unsupported source list: {url}".format(
-                    url=url)
+                    url=url))
 
         if self.recipe['weighted_sorting']['enabled']:
             if self.config['tmdb']['api_key']:
@@ -82,7 +84,8 @@ class Recipe(object):
         print(u"Trying to match with items from the '{library}' library ".format(
             library=self.source_library_config['name']))
         try:
-            source_library = self.plex.library.section(self.source_library_config['name'])
+            source_library = self.plex.server.library.section(
+                self.source_library_config['name'])
         except:
             print(u"The '{library}' library does not exist in Plex.".format(
                 library=self.source_library_config['name']))
@@ -274,22 +277,20 @@ class Recipe(object):
         print(u"Creating the '{}' library in Plex...".format(
             self.recipe['new_library']['name']))
         try:
-            new_library = self.plex.library.section(self.recipe['new_library']['name'])
-            new_library_key = new_library.key
+            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
             print(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
         except:
-            plexutils.create_new_library(self.recipe['new_library']['name'], self.recipe['new_library']['folder'], self.library_type)
-            new_library = self.plex.library.section(self.recipe['new_library']['name'])
-            new_library_key = new_library.key
+            self.plex.create_new_library(self.recipe['new_library']['name'], self.recipe['new_library']['folder'], self.library_type)
+            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
 
         # Wait for metadata to finish downloading before continuing
         print(u"Waiting for metadata to finish downloading...")
-        new_library = self.plex.library.section(self.recipe['new_library']['name'])
+        new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
         while new_library.refreshing:
             time.sleep(5)
-            new_library = self.plex.library.section(self.recipe['new_library']['name'])
+            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
 
         # Retrieve a list of items from the new library
         print(u"Retrieving a list of items from the '{library}' library in "
@@ -320,9 +321,9 @@ class Recipe(object):
             elif force_imdb_id_match:
                 # Only IMDB ID found for some items
                 if tmdb_id:
-                    imdb_id = tmdb.get_imdb_id(tmdb_id)
+                    imdb_id = self.tmdb.get_imdb_id(tmdb_id)
                 elif tvdb_id:
-                    imdb_id = tvdb.get_imdb_id(tvdb_id)
+                    imdb_id = self.tvdb.get_imdb_id(tvdb_id)
                 if imdb_id and str(imdb_id) in item_ids:
                     imdb_map[imdb_id] = m
                 else:
@@ -341,7 +342,7 @@ class Recipe(object):
                 if not item:
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
-                    plexutils.add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], self.library_type, self.recipe['new_library_key']['sort_title']['format'], self.recipe['new_library_key']['sort_title']['visible'])
+                    self.plex.set_sort_title(new_library.key, item.ratingKey, i+1, m['title'], self.library_type, self.recipe['new_library']['sort_title']['format'], self.recipe['new_library']['sort_title']['visible'])
         else:
             i = 0
             for m in item_list:
@@ -352,7 +353,7 @@ class Recipe(object):
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
                     i += 1
-                    plexutils.add_sort_title(new_library_key, item.ratingKey, i, m['title'], self.library_type, self.recipe['new_library_key']['sort_title']['format'], self.recipe['new_library_key']['sort_title']['visible'])
+                    self.plex.set_sort_title(new_library.key, item.ratingKey, i, m['title'], self.library_type, self.recipe['new_library']['sort_title']['format'], self.recipe['new_library']['sort_title']['visible'])
 
         if self.recipe['new_library']['remove_from_library']:
             # Remove items from the new library which no longer qualify
@@ -441,17 +442,17 @@ class Recipe(object):
                 library=self.recipe['new_library']['name']))
             new_library.update()
             time.sleep(10)
-            new_library = self.plex.library.section(self.recipe['new_library']['name'])
+            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
             while new_library.refreshing:
                 time.sleep(5)
-                new_library = self.plex.library.section(self.recipe['new_library']['name'])
+                new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
             new_library.emptyTrash()
             all_new_items = new_library.all()
         else:
             while imdb_map:
                 imdb_id, item = imdb_map.popitem()
                 i += 1
-                plexutils.add_sort_title(new_library_key, item.ratingKey, i, item.title, self.library_type, self.recipe['new_library_key']['sort_title']['format'], self.recipe['new_library_key']['sort_title']['visible'])
+                self.plex.set_sort_title(new_library.key, item.ratingKey, i, item.title, self.library_type, self.recipe['new_library']['sort_title']['format'], self.recipe['new_library']['sort_title']['visible'])
 
         return missing_items, len(all_new_items)
 
@@ -469,7 +470,7 @@ class Recipe(object):
                     self.recipe['new_library']['max_age'] or 0)
             else:
                 raise Exception("Unsupported source list: {url}".format(
-                    url=url)
+                    url=url))
 
         if self.recipe['weighted_sorting']['enabled']:
             if self.config['tmdb']['api_key']:
@@ -479,8 +480,7 @@ class Recipe(object):
                 print(u"Warning: TMDd API key is required for weighted sorting")
 
         try:
-            new_library = self.plex.library.section(self.recipe['new_library']['name'])
-            new_library_key = new_library.key
+            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
         except:
             raise Exception("Library '{library}' does not exist".format(
                 library=self.recipe['new_library']['name']))
@@ -488,10 +488,10 @@ class Recipe(object):
         new_library.update()
         # Wait for metadata to finish downloading before continuing
         print(u"Waiting for metadata to finish downloading...")
-        new_library = self.plex.library.section(self.recipe['new_library']['name'])
+        new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
         while new_library.refreshing:
             time.sleep(5)
-            new_library = self.plex.library.section(self.recipe['new_library']['name'])
+            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
 
         # Retrieve a list of items from the new library
         print(u"Retrieving a list of items from the '{library}' library in "
@@ -522,13 +522,15 @@ class Recipe(object):
             elif force_imdb_id_match:
                 # Only IMDB ID found for some items
                 if tmdb_id:
-                    imdb_id = tmdb.get_imdb_id(tmdb_id)
+                    imdb_id = self.tmdb.get_imdb_id(tmdb_id)
                 elif tvdb_id:
-                    imdb_id = tvdb.get_imdb_id(tvdb_id)
+                    imdb_id = self.tvdb.get_imdb_id(tvdb_id)
                 if imdb_id and str(imdb_id) in item_ids:
                     imdb_map[imdb_id] = m
                 else:
                     imdb_map[m.ratingKey] = m
+            else:
+                imdb_map[m.ratingKey] = m
 
         # Modify the sort titles
         print(u"Setting the sort titles for the '{}' library...".format(
@@ -541,7 +543,7 @@ class Recipe(object):
                 if not item:
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
-                    plexutils.add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], self.library_type, self.recipe['new_library_key']['sort_title']['format'], self.recipe['new_library_key']['sort_title']['visible'])
+                    self.plex.set_sort_title(new_library.key, item.ratingKey, i+1, m['title'], self.library_type, self.recipe['new_library']['sort_title']['format'], self.recipe['new_library']['sort_title']['visible'])
         else:
             i = 0
             for m in item_list:
@@ -552,11 +554,11 @@ class Recipe(object):
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
                     i += 1
-                    plexutils.add_sort_title(new_library_key, item.ratingKey, i, m['title'], self.library_type, self.recipe['new_library_key']['sort_title']['format'], self.recipe['new_library_key']['sort_title']['visible'])
+                    self.plex.set_sort_title(new_library.key, item.ratingKey, i, m['title'], self.library_type, self.recipe['new_library']['sort_title']['format'], self.recipe['new_library']['sort_title']['visible'])
             while imdb_map:
                 imdb_id, item = imdb_map.popitem()
                 i += 1
-                plexutils.add_sort_title(new_library_key, item.ratingKey, i, item.title, self.library_type, self.recipe['new_library_key']['sort_title']['format'], self.recipe['new_library_key']['sort_title']['visible'])
+                self.plex.set_sort_title(new_library.key, item.ratingKey, i, item.title, self.library_type, self.recipe['new_library']['sort_title']['format'], self.recipe['new_library']['sort_title']['visible'])
 
         return len(all_new_items)
 
@@ -603,7 +605,7 @@ class Recipe(object):
             return release_date
 
         def _get_age_weight(days):
-            if library_type == 'movie':
+            if self.library_type == 'movie':
                 # Everything younger than this will get 1
                 min_days = 100
                 # Everything older than this will get 0
@@ -628,15 +630,15 @@ class Recipe(object):
         tmdb_votes = []
         for i, m in enumerate(item_list):
             m['original_idx'] = i + 1
-            details = tmdb.get_details(m['tmdb_id'], library_type)
+            details = self.tmdb.get_details(m['tmdb_id'], self.library_type)
             if not details:
                 print(u"Warning: No TMDb data for {}".format(m['title']))
                 continue
             m['tmdb_popularity'] = float(details['popularity'])
             m['tmdb_vote'] = float(details['vote_average'])
             m['tmdb_vote_count'] = int(details['vote_count'])
-            if library_type == 'movie':
-                if self.recipe['new_library']['better_release_date']:
+            if self.library_type == 'movie':
+                if self.recipe['weighted_sorting']['better_release_date']:
                     m['release_date'] = _get_non_theatrical_release(
                         details['release_dates']) or \
                         datetime.datetime.strptime(details['release_date'],
@@ -645,13 +647,13 @@ class Recipe(object):
                     m['release_date'] = datetime.datetime.strptime(
                         details['release_date'], '%Y-%m-%d').date()
                 item_age_td = today - m['release_date']
-            elif library_type == 'tv':
+            elif self.library_type == 'tv':
                 m['last_air_date'] = datetime.datetime.strptime(
                     details['last_air_date'], '%Y-%m-%d').date()
                 item_age_td = today - m['last_air_date']
             m['genres'] = [g['name'].lower() for g in details['genres']]
             m['age'] = item_age_td.days
-            if library_type == 'tv' or m['tmdb_vote_count'] > 150 or m['age'] > 50:
+            if self.library_type == 'tv' or m['tmdb_vote_count'] > 150 or m['age'] > 50:
                 tmdb_votes.append(m['tmdb_vote'])
             total_tmdb_vote += m['tmdb_vote']
             item_list[i] = m
@@ -665,7 +667,7 @@ class Recipe(object):
             index_weight = float(total_items - i) / float(total_items)
             m['index_weight'] = index_weight * weights['index']
             if m.get('tmdb_popularity'):
-                if library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
+                if self.library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
                     vote_weight = (tmdb_votes.index(m['tmdb_vote']) + 1) / float(len(tmdb_votes))
                 else:
                     # Assume below average rating for new/less voted items
