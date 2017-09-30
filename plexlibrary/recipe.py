@@ -17,24 +17,20 @@ import requests
 import trakt
 import yaml
 
-from colors import Colors
 import plexutils
 import tmdb
+import tvdb
+from config import ConfigParser
+from recipes import RecipeParser
+from utils import Colors
 
 
 class Recipe(object):
-    def __init__(self, recipe_name, sory_only=False):
+    def __init__(self, recipe_name, sort_only=False, config_file=None):
         self.recipe_name = recipe_name
 
-        # TODO Anything but this
-        parent_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__),
-            os.path.pardir)))
-        sys.path.append(parent_dir)
-        self.recipe = importlib.import_module('recipes.' + recipe_name)
-        sys.path.remove(parent_dir)
-
-        with open(os.path.join(parent_dir, 'config.yml'), 'r') as ymlfile:
-            self.config = yaml.load(ymlfile)
+        self.config = ConfigParser(config_file)
+        self.recipe = RecipeParser(recipe_name)
 
         if self.recipe.LIBRARY_TYPE.lower().startswith('movie'):
             self.library_type = 'movie'
