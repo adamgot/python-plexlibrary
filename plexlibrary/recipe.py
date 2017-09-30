@@ -1,215 +1,25 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """recipe
 """
 
-import importlib
-import sys
-import os
-import json
-import subprocess
-import time
 import datetime
-import shelve
+import importlib
+import json
+import os
 import random
+import shelve
+import subprocess
+import sys
+import time
 
 import plexapi.server
 import requests
 import trakt
 import yaml
 
-TMDB_REQUEST_COUNT = 0  # DO NOT CHANGE
-TVDB_TOKEN = None
-
-
-class Colors(object):
-    RED  = "\033[1;31m"
-    BLUE = "\033[1;34m"
-    CYAN = "\033[1;36m"
-    GREEN = "\033[0;32m"
-    RESET = "\033[0;0m"
-    BOLD = "\033[;1m"
-    REVERSE = "\033[;7m"
-
-
-def create_new_library(name, folder, library_type='movie'):
-    headers = {"X-Plex-Token": config.PLEX_TOKEN}
-    params = {
-        'name': name,
-        'language': 'en',
-        'location': folder,
-    }
-    if library_type == 'movie':
-        params['type'] = 'movie'
-        params['agent'] = 'com.plexapp.agents.imdb'
-        params['scanner'] = 'Plex Movie Scanner'
-    elif library_type == 'tv':
-        params['type'] = 'tv'
-        params['agent'] = 'com.plexapp.agents.tvdb'  # FIXME?
-        params['scanner'] = 'TheTVDB'
-    else:
-        raise Exception("Library type should be 'movie' or 'tv'")
-
-    url = '{base_url}/library/sections'.format(base_url=config.PLEX_URL)
-    r = requests.post(url, headers=headers, params=params)
-
-
-def add_sort_title(library_key, rating_key, number, title, library_type):
-    headers = {'X-Plex-Token': config.PLEX_TOKEN}
-    if library_type == 'movie':
-        search_type = 1
-    elif library_type == 'tv':
-        search_type = 2
-    params = {
-        'type': search_type,
-        'id': rating_key,
-        'titleSort.value': recipe.SORT_TITLE_FORMAT.format(
-            number=str(number).zfill(6), title=title),
-        'titleSort.locked': 1,
-    }
-
-    if recipe.SORT_TITLE_VISIBLE:
-        params['title.value'] = recipe.SORT_TITLE_FORMAT.format(
-            number=str(number), title=title)
-        params['title.locked'] = 1
-    else:
-        params['title.value'] = title=title
-        params['title.locked'] = 0
-
-    url = "{base_url}/library/sections/{library}/all".format(
-            base_url=config.PLEX_URL, library=library_key)
-    r = requests.put(url, headers=headers, params=params)
-
-
-def get_imdb_id_from_tmdb(tmdb_id, library_type='movie'):
-    global TMDB_REQUEST_COUNT
-
-    if library_type not in ('movie', 'tv'):
-        raise Exception("Library type should be 'movie' or 'tv'")
-
-    # Use cache
-    cache = shelve.open(config.TMDB_CACHE_FILE)
-    if cache.has_key(str(tmdb_id)):
-        item = cache[str(tmdb_id)]
-        cache.close()
-        return item.get('imdb_id')
-
-    if not config.TMDB_API_KEY:
-        cache.close()
-        return None
-
-    # Wait 10 seconds for the TMDb rate limit
-    if TMDB_REQUEST_COUNT >= 40:
-        print(u"Waiting 10 seconds for the TMDb rate limit...")
-        time.sleep(10)
-        TMDB_REQUEST_COUNT = 0
-
-    params = {
-        'api_key': config.TMDB_API_KEY,
-    }
-
-    if library_type == 'movie':
-        url = "https://api.themoviedb.org/3/movie/{tmdb_id}".format(
-            tmdb_id=tmdb_id)
-    else:
-        url = "https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids".format(
-            tmdb_id=tmdb_id)
-    r = requests.get(url, params=params)
-
-    TMDB_REQUEST_COUNT += 1
-
-    if r.status_code == 200:
-        item = json.loads(r.text)
-        item['cached'] = int(time.time())
-        cache[str(tmdb_id)] = item
-        cache.close()
-        return item.get('imdb_id')
-    else:
-        cache.close()
-        return None
-
-
-def get_tmdb_details(tmdb_id, library_type='movie'):
-    global TMDB_REQUEST_COUNT
-
-    if library_type not in ('movie', 'tv'):
-        raise Exception("Library type should be 'movie' or 'tv'")
-
-    # Use cache
-    cache = shelve.open(config.TMDB_CACHE_FILE)
-    if cache.has_key(str(tmdb_id)) and \
-            (cache[str(tmdb_id)]['cached'] + 3600 * 24) > int(time.time()):
-        item = cache[str(tmdb_id)]
-        cache.close()
-        return item
-
-    if not config.TMDB_API_KEY:
-        cache.close()
-        return None
-
-    # Wait 10 seconds for the TMDb rate limit
-    if TMDB_REQUEST_COUNT >= 40:
-        print(u"Waiting 10 seconds for the TMDb rate limit...")
-        time.sleep(10)
-        TMDB_REQUEST_COUNT = 0
-
-    params = {
-        'api_key': config.TMDB_API_KEY,
-    }
-
-    if library_type == 'movie':
-        params['append_to_response'] = 'release_dates'
-        url = "https://api.themoviedb.org/3/movie/{tmdb_id}".format(
-                tmdb_id=tmdb_id)
-    else:
-        url = "https://api.themoviedb.org/3/tv/{tmdb_id}".format(
-                tmdb_id=tmdb_id)
-    r = requests.get(url, params=params)
-
-    TMDB_REQUEST_COUNT += 1
-
-    if r.status_code == 200:
-        item = json.loads(r.text)
-        item['cached'] = int(time.time())
-        cache[str(tmdb_id)] = item
-        cache.close()
-        return item
-    else:
-        cache.close()
-        return None
-
-
-def get_imdb_id_from_tvdb(tvdb_id):
-    global TVDB_TOKEN
-    # TODO Cache
-
-    if not config.TVDB_API_KEY:
-        return None
-
-    if not TVDB_TOKEN:
-        data = {
-            "apikey": config.TVDB_API_KEY,
-            "userkey": config.TVDB_USER_KEY,
-            "username": config.TVDB_USERNAME,
-        }
-
-        url = "https://api.thetvdb.com/login"
-        r = requests.post(url, json=data)
-
-        if r.status_code == 200:
-            result = r.json()
-            TVDB_TOKEN = result['token']
-        else:
-            return None
-
-    url = "https://api.thetvdb.com/series/{id}".format(id=tvdb_id)
-    r = requests.get(url, headers={'Authorization': 'Bearer {token}'.format(token=TVDB_TOKEN)})
-
-    if r.status_code == 200:
-        tv_show = r.json()
-        return tv_show['data']['imdbId']
-    else:
-        return None
+from colors import Colors
+import plexutils
+import tmdb
 
 
 class Recipe(object):
@@ -286,7 +96,7 @@ class Recipe(object):
         tmdb_votes = []
         for i, m in enumerate(item_list):
             m['original_idx'] = i + 1
-            details = get_tmdb_details(m['tmdb_id'], library_type)
+            details = tmdb.get_details(m['tmdb_id'], library_type)
             if not details:
                 print(u"Warning: No TMDb data for {}".format(m['title']))
                 continue
@@ -594,7 +404,13 @@ class Recipe(object):
                             break
                         old_path_file = part.file.encode('UTF-8')
                         old_path, file_name = os.path.split(old_path_file)
-                        old_path =  self.recipe.SOURCE_LIBRARY_FOLDERS[0] + '/' + old_path.replace(self.recipe.SOURCE_LIBRARY_FOLDERS[0], '').strip('/').split('/')[0]
+                        old_path = (
+                            self.recipe.SOURCE_LIBRARY_FOLDERS[0]
+                            + '/'
+                            + old_path.replace(
+                                self.recipe.SOURCE_LIBRARY_FOLDERS[0],
+                                ''
+                              ).strip('/').split('/')[0])
 
                         folder_name = ''
                         for f in self.recipe.SOURCE_LIBRARY_FOLDERS:
@@ -604,7 +420,8 @@ class Recipe(object):
                         new_path = os.path.join(self.recipe.NEW_LIBRARY_FOLDER, folder_name)
                         dir = True
 
-                        if (dir and not os.path.exists(new_path)) or (not dir and not os.path.isfile(new_path)):
+                        if ((dir and not os.path.exists(new_path))
+                                or (not dir and not os.path.isfile(new_path))):
                             try:
                                 if os.name == 'nt':
                                     if dir:
@@ -637,7 +454,7 @@ class Recipe(object):
 
             new_library.update()
         except:
-            create_new_library(self.recipe.NEW_LIBRARY_NAME, self.recipe.NEW_LIBRARY_FOLDER, self.library_type)
+            plexutils.create_new_library(self.recipe.NEW_LIBRARY_NAME, self.recipe.NEW_LIBRARY_FOLDER, self.library_type)
             new_library = self.plex.library.section(self.recipe.NEW_LIBRARY_NAME)
             new_library_key = new_library.key
 
@@ -677,9 +494,9 @@ class Recipe(object):
             elif force_imdb_id_match:
                 # Only IMDB ID found for some items
                 if tmdb_id:
-                    imdb_id = get_imdb_id_from_tmdb(tmdb_id)
+                    imdb_id = tmdb.get_imdb_id(tmdb_id)
                 elif tvdb_id:
-                    imdb_id = get_imdb_id_from_tvdb(tvdb_id)
+                    imdb_id = tvdb.get_imdb_id(tvdb_id)
                 if imdb_id and str(imdb_id) in item_ids:
                     imdb_map[imdb_id] = m
                 else:
@@ -698,7 +515,7 @@ class Recipe(object):
                 if not item:
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
-                    add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], self.library_type)
+                    plexutils.add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], self.library_type)
         else:
             i = 0
             for m in item_list:
@@ -709,7 +526,7 @@ class Recipe(object):
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
                     i += 1
-                    add_sort_title(new_library_key, item.ratingKey, i, m['title'], self.library_type)
+                    plexutils.add_sort_title(new_library_key, item.ratingKey, i, m['title'], self.library_type)
 
         if self.recipe.REMOVE_FROM_LIBRARY:
             # Remove items from the new library which no longer qualify
@@ -806,7 +623,7 @@ class Recipe(object):
             while imdb_map:
                 imdb_id, item = imdb_map.popitem()
                 i += 1
-                add_sort_title(new_library_key, item.ratingKey, i, item.title, self.library_type)
+                plexutils.add_sort_title(new_library_key, item.ratingKey, i, item.title, self.library_type)
 
         return missing_items, len(all_new_items)
 
@@ -926,9 +743,9 @@ class Recipe(object):
             elif force_imdb_id_match:
                 # Only IMDB ID found for some items
                 if tmdb_id:
-                    imdb_id = get_imdb_id_from_tmdb(tmdb_id)
+                    imdb_id = tmdb.get_imdb_id(tmdb_id)
                 elif tvdb_id:
-                    imdb_id = get_imdb_id_from_tvdb(tvdb_id)
+                    imdb_id = tvdb.get_imdb_id(tvdb_id)
                 if imdb_id and str(imdb_id) in item_ids:
                     imdb_map[imdb_id] = m
                 else:
@@ -945,7 +762,7 @@ class Recipe(object):
                 if not item:
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
-                    add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], self.library_type)
+                    plexutils.add_sort_title(new_library_key, item.ratingKey, i+1, m['title'], self.library_type)
         else:
             i = 0
             for m in item_list:
@@ -956,11 +773,11 @@ class Recipe(object):
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')), None)
                 if item:
                     i += 1
-                    add_sort_title(new_library_key, item.ratingKey, i, m['title'], self.library_type)
+                    plexutils.add_sort_title(new_library_key, item.ratingKey, i, m['title'], self.library_type)
             while imdb_map:
                 imdb_id, item = imdb_map.popitem()
                 i += 1
-                add_sort_title(new_library_key, item.ratingKey, i, item.title, self.library_type)
+                plexutils.add_sort_title(new_library_key, item.ratingKey, i, item.title, self.library_type)
 
         return len(all_new_items)
 
