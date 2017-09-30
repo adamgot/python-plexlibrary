@@ -2,7 +2,7 @@
 import requests
 
 
-def add_sort_title(library_key, rating_key, number, title, library_type):
+def add_sort_title(library_key, rating_key, number, title, library_type, title_format, visible=False):
     headers = {'X-Plex-Token': config.PLEX_TOKEN}
     if library_type == 'movie':
         search_type = 1
@@ -11,13 +11,13 @@ def add_sort_title(library_key, rating_key, number, title, library_type):
     params = {
         'type': search_type,
         'id': rating_key,
-        'titleSort.value': recipe.SORT_TITLE_FORMAT.format(
+        'titleSort.value': title_format.format(
             number=str(number).zfill(6), title=title),
         'titleSort.locked': 1,
     }
 
-    if recipe.SORT_TITLE_VISIBLE:
-        params['title.value'] = recipe.SORT_TITLE_FORMAT.format(
+    if set_title:
+        params['title.value'] = title_format.format(
             number=str(number), title=title)
         params['title.locked'] = 1
     else:
