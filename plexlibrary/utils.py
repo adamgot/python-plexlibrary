@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import yaml
+from yaml import Loader, SafeLoader
 
 
 class Colors(object):
@@ -14,6 +15,12 @@ class Colors(object):
 
 class YAMLBase(object):
     def __init__(self, filename):
+        # Make sure pyyaml always returns unicode
+        def construct_yaml_str(self, node):
+            return self.construct_scalar(node)
+        Loader.add_constructor(u'tag:yaml.org,2002:str', construct_yaml_str)
+        SafeLoader.add_constructor(u'tag:yaml.org,2002:str', construct_yaml_str)
+
         with open(filename, 'r') as f:
             try:
                self.data = yaml.safe_load(f)
