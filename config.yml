@@ -1,0 +1,30 @@
+# Plex server details
+# * Defaults to plexapi config
+plex:
+    baseurl: 'http://localhost:32400'
+    token: ''  # https://support.plex.tv/hc/en-us/articles/204059436-Finding-an-authentication-token-X-Plex-Token
+
+# trakt.tv API details
+# * Required for fetching trakt lists
+# Create a Trakt.tv account, then create an API app here:
+# https://trakt.tv/oauth/applications/new
+trakt:
+    username: ''
+    client_id: ''
+    client_secret: ''
+
+# The Movie Database details
+# * Required for fetching scores, release dates etc for weighted sorting
+# * Required for matching any library items that use the TMDb agent with the items from the lists
+#   (if those items do not include a TMDb ID)
+tmdb:
+    api_key: ''
+    cache_file: '/tmp/tmdb_details.shelve'
+
+# TheTVDB details
+# * Required for matching any library items that use the TheTVDB agent with the items from the lists
+#   (if those items do not include a TheTVDB ID)
+tvdb:
+    username: ''
+    api_key: ''
+    user_key: ''
