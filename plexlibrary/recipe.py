@@ -14,7 +14,6 @@ import time
 
 import plexapi.server
 import requests
-import trakt
 import yaml
 
 import plexutils
@@ -26,15 +25,18 @@ from utils import Colors
 
 
 class Recipe(object):
+    plex = None
+    trakt = None
+
     def __init__(self, recipe_name, sort_only=False, config_file=None):
         self.recipe_name = recipe_name
 
         self.config = ConfigParser(config_file)
         self.recipe = RecipeParser(recipe_name)
 
-        if self.recipe.LIBRARY_TYPE.lower().startswith('movie'):
+        if self.recipe['library_type'].lower().startswith('movie'):
             self.library_type = 'movie'
-        elif self.recipe.LIBRARY_TYPE.lower().startswith('tv'):
+        elif self.recipe['library_type'].lower().startswith('tv'):
             self.library_type = 'tv'
         else:
             raise Exception("Library type should be 'movie' or 'tv'")
@@ -45,138 +47,11 @@ class Recipe(object):
             raise Exception("No Plex server found at: {base_url}".format(
                 base_url=self.config['plex']['baseurl']))
 
-    def weighted_sorting(self, item_list, recipe, library_type):
-        def _get_non_theatrical_release(release_dates):
-            # Returns earliest release date that is not theatrical
-            # TODO PREDB
-            types = {}
-            for country in release_dates.get('results', []):
-                # FIXME Look at others too?
-                if country['iso_3166_1'] != 'US':
-                    continue
-                for d in country['release_dates']:
-                    if d['type'] in (4, 5, 6):
-                        # 4: Digital, 5: Physical, 6: TV
-                        types[str(d['type'])] = datetime.datetime.strptime(
-                            d['release_date'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
-                break
-
-            release_date = None
-            for t, d in types.items():
-                if not release_date or d < release_date:
-                    release_date = d
-
-            return release_date
-
-        def _get_age_weight(days):
-            if library_type == 'movie':
-                # Everything younger than this will get 1
-                min_days = 100
-                # Everything older than this will get 0
-                max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 200
-            else:
-                min_days = 14
-                max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 100
-            if days <= min_days:
-                return 1
-            elif days >= max_days:
-                return 0
-            else:
-                return 1 - (days - min_days) / (max_days - min_days)
-
-        total_items = len(item_list)
-
-        # TMDB details
-        today = datetime.date.today()
-        total_tmdb_vote = 0.0
-        tmdb_votes = []
-        for i, m in enumerate(item_list):
-            m['original_idx'] = i + 1
-            details = tmdb.get_details(m['tmdb_id'], library_type)
-            if not details:
-                print(u"Warning: No TMDb data for {}".format(m['title']))
-                continue
-            m['tmdb_popularity'] = float(details['popularity'])
-            m['tmdb_vote'] = float(details['vote_average'])
-            m['tmdb_vote_count'] = int(details['vote_count'])
-            if library_type == 'movie':
-                if recipe.BETTER_RELEASE_DATE:
-                    m['release_date'] = _get_non_theatrical_release(
-                        details['release_dates']) or \
-                        datetime.datetime.strptime(details['release_date'],
-                        '%Y-%m-%d').date()
-                else:
-                    m['release_date'] = datetime.datetime.strptime(
-                        details['release_date'], '%Y-%m-%d').date()
-                item_age_td = today - m['release_date']
-            elif library_type == 'tv':
-                m['last_air_date'] = datetime.datetime.strptime(
-                    details['last_air_date'], '%Y-%m-%d').date()
-                item_age_td = today - m['last_air_date']
-            m['genres'] = [g['name'].lower() for g in details['genres']]
-            m['age'] = item_age_td.days
-            if library_type == 'tv' or m['tmdb_vote_count'] > 150 or m['age'] > 50:
-                tmdb_votes.append(m['tmdb_vote'])
-            total_tmdb_vote += m['tmdb_vote']
-            item_list[i] = m
-        average_tmdb_vote = total_tmdb_vote / float(total_items)
-
-        tmdb_votes.sort()
-
-        for i, m in enumerate(item_list):
-            # Distribute all weights evenly from 0 to 1 (times global factor)
-            # More weight means it'll go higher in the final list
-            index_weight = float(total_items - i) / float(total_items)
-            m['index_weight'] = index_weight * recipe.WEIGHT_INDEX
-            if m.get('tmdb_popularity'):
-                if library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
-                    vote_weight = (tmdb_votes.index(m['tmdb_vote']) + 1) / float(len(tmdb_votes))
-                else:
-                    # Assume below average rating for new/less voted items
-                    vote_weight = 0.25
-                age_weight = _get_age_weight(float(m['age']))
-
-                if hasattr(recipe, 'WEIGHT_RANDOM'):
-                    random_weight = random.random()
-                    m['random_weight'] = random_weight * recipe.WEIGHT_RANDOM
-                else:
-                    m['random_weight'] = 0.0
-
-                m['vote_weight'] = vote_weight * recipe.WEIGHT_VOTE
-                m['age_weight'] = age_weight * recipe.WEIGHT_AGE
-
-                weight = (m['index_weight'] + m['vote_weight']
-                          + m['age_weight'] + m['random_weight'])
-                for genre, value in recipe.WEIGHT_GENRE_BIAS.items():
-                    if genre.lower() in m['genres']:
-                        weight *= value
-
-                m['weight'] = weight
-            else:
-                m['vote_weight'] = 0.0
-                m['age_weight'] = 0.0
-                m['weight'] = index_weight
-            item_list[i] = m
-
-        item_list.sort(key = lambda m: m['weight'], reverse=True)
-
-        for i, m in enumerate(item_list):
-            if (i+1) < m['original_idx']:
-                net = Colors.GREEN + u'↑'
-            elif (i+1) > m['original_idx']:
-                net = Colors.RED + u'↓'
-            else:
-                net = u' '
-            net += str(abs(i + 1 - m['original_idx'])).rjust(3)
-            print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
-                "age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
-                "{}{}".format(
-                    net, i+1, m['original_idx'], round(m['index_weight'], 3),
-                    m.get('tmdb_vote'), round(m['vote_weight'], 3), m.get('age'),
-                    round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
-                    round(m['weight'], 3), m['title'], m['year'], Colors.RESET))
-
-        return item_list
+        if config['trakt']['username']:
+            self.trakt = traktutils.Trakt(
+                config['trakt']['username'],
+                client_id=config['trakt']['client_id'],
+                client_secret=config['trakt']['client_secret'])
 
     def _run(self):
         item_list = []
@@ -184,69 +59,19 @@ class Recipe(object):
         force_imdb_id_match = False
         curyear = datetime.datetime.now().year
 
-        def _movie_add_from_trakt_list(url):
-            print(u"Retrieving the trakt list: {}".format(url))
-            movie_data = self.trakt_core._handle_request('get', url)
-            for m in movie_data:
-                # Skip already added movies
-                if m['movie']['ids']['imdb'] in item_ids:
-                    continue
-                # Skip old movies
-                if self.recipe.MAX_AGE != 0 \
-                        and (curyear - (self.recipe.MAX_AGE - 1)) > int(m['movie']['year']):
-                    continue
-                item_list.append({
-                    'id': m['movie']['ids']['imdb'],
-                    'tmdb_id': m['movie']['ids'].get('tmdb', ''),
-                    'title': m['movie']['title'],
-                    'year': m['movie']['year'],
-                })
-                item_ids.append(m['movie']['ids']['imdb'])
-                if m['movie']['ids'].get('tmdb'):
-                    item_ids.append('tmdb' + str(m['movie']['ids']['tmdb']))
-                else:
-                    force_imdb_id_match = True
-
-        def _tv_add_from_trakt_list(url):
-            print(u"Retrieving the trakt list: {}".format(url))
-            show_data = self.trakt_core._handle_request('get', url)
-            for m in show_data:
-                # Skip already added shows
-                if m['show']['ids']['imdb'] in item_ids:
-                    continue
-                # Skip old shows
-                if self.recipe.MAX_AGE != 0 \
-                        and (curyear - (self.recipe.MAX_AGE - 1)) > int(m['show']['year']):
-                    continue
-                item_list.append({
-                    'id': m['show']['ids']['imdb'],
-                    'tmdb_id': m['show']['ids'].get('tmdb', ''),
-                    'tvdb_id': m['show']['ids'].get('tvdb', ''),
-                    'title': m['show']['title'],
-                    'year': m['show']['year'],
-                })
-                item_ids.append(m['show']['ids']['imdb'])
-                if m['show']['ids'].get('tmdb'):
-                    item_ids.append('tmdb' + str(m['show']['ids']['tmdb']))
-                else:
-                    force_imdb_id_match = True
-                if m['show']['ids'].get('tvdb'):
-                    item_ids.append('tvdb' + str(m['show']['ids']['tvdb']))
-                else:
-                    force_imdb_id_match = True
-
         # Get the trakt lists
-        if self.library_type == 'movie':
-            for url in self.recipe.SOURCE_LIST_URLS:
-                _movie_add_from_trakt_list(url)
-        else:
-            for url in self.recipe.SOURCE_LIST_URLS:
-                _tv_add_from_trakt_list(url)
+        for url in self.recipe['source_list_urls']:
+            if 'api.trakt.tv' in url:
+                (item_list, item_ids) = self.trakt.add_items(
+                    self.library_type, url, item_list, item_ids)
+            else:
+                raise Exception("Unsupported source list: {url}".format(
+                    url=url)
 
-        if self.recipe.WEIGHTED_SORTING:
-            if config.TMDB_API_KEY:
+        if self.recipe['weighted_sorting']['enabled']:
+            if config['tmdb']['api_key']:
                 print(u"Getting data from TMDb to add weighted sorting...")
-                item_list = weighted_sorting(item_list, self.recipe, self.library_type)
+                item_list = self.weighted_sorting(item_list)
             else:
                 print(u"Warning: TMDd API key is required for weighted sorting")
 
@@ -796,5 +621,136 @@ class Recipe(object):
                     idx=idx+1, release=item.get('release_date', ''),
                     imdb_id=item['id'], title=item['title'], year=item['year']))
 
-        print(u"Done!")
+    def weighted_sorting(self, item_list, recipe, library_type):
+        def _get_non_theatrical_release(release_dates):
+            # Returns earliest release date that is not theatrical
+            # TODO PREDB
+            types = {}
+            for country in release_dates.get('results', []):
+                # FIXME Look at others too?
+                if country['iso_3166_1'] != 'US':
+                    continue
+                for d in country['release_dates']:
+                    if d['type'] in (4, 5, 6):
+                        # 4: Digital, 5: Physical, 6: TV
+                        types[str(d['type'])] = datetime.datetime.strptime(
+                            d['release_date'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                break
+
+            release_date = None
+            for t, d in types.items():
+                if not release_date or d < release_date:
+                    release_date = d
+
+            return release_date
+
+        def _get_age_weight(days):
+            if library_type == 'movie':
+                # Everything younger than this will get 1
+                min_days = 100
+                # Everything older than this will get 0
+                max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 200
+            else:
+                min_days = 14
+                max_days = float(recipe.MAX_AGE) / 4.0 * 365.25 or 100
+            if days <= min_days:
+                return 1
+            elif days >= max_days:
+                return 0
+            else:
+                return 1 - (days - min_days) / (max_days - min_days)
+
+        total_items = len(item_list)
+
+        # TMDB details
+        today = datetime.date.today()
+        total_tmdb_vote = 0.0
+        tmdb_votes = []
+        for i, m in enumerate(item_list):
+            m['original_idx'] = i + 1
+            details = tmdb.get_details(m['tmdb_id'], library_type)
+            if not details:
+                print(u"Warning: No TMDb data for {}".format(m['title']))
+                continue
+            m['tmdb_popularity'] = float(details['popularity'])
+            m['tmdb_vote'] = float(details['vote_average'])
+            m['tmdb_vote_count'] = int(details['vote_count'])
+            if library_type == 'movie':
+                if recipe.BETTER_RELEASE_DATE:
+                    m['release_date'] = _get_non_theatrical_release(
+                        details['release_dates']) or \
+                        datetime.datetime.strptime(details['release_date'],
+                        '%Y-%m-%d').date()
+                else:
+                    m['release_date'] = datetime.datetime.strptime(
+                        details['release_date'], '%Y-%m-%d').date()
+                item_age_td = today - m['release_date']
+            elif library_type == 'tv':
+                m['last_air_date'] = datetime.datetime.strptime(
+                    details['last_air_date'], '%Y-%m-%d').date()
+                item_age_td = today - m['last_air_date']
+            m['genres'] = [g['name'].lower() for g in details['genres']]
+            m['age'] = item_age_td.days
+            if library_type == 'tv' or m['tmdb_vote_count'] > 150 or m['age'] > 50:
+                tmdb_votes.append(m['tmdb_vote'])
+            total_tmdb_vote += m['tmdb_vote']
+            item_list[i] = m
+        average_tmdb_vote = total_tmdb_vote / float(total_items)
+
+        tmdb_votes.sort()
+
+        for i, m in enumerate(item_list):
+            # Distribute all weights evenly from 0 to 1 (times global factor)
+            # More weight means it'll go higher in the final list
+            index_weight = float(total_items - i) / float(total_items)
+            m['index_weight'] = index_weight * recipe.WEIGHT_INDEX
+            if m.get('tmdb_popularity'):
+                if library_type == 'tv' or m.get('tmdb_vote_count') > 150 or m['age'] > 50:
+                    vote_weight = (tmdb_votes.index(m['tmdb_vote']) + 1) / float(len(tmdb_votes))
+                else:
+                    # Assume below average rating for new/less voted items
+                    vote_weight = 0.25
+                age_weight = _get_age_weight(float(m['age']))
+
+                if hasattr(recipe, 'WEIGHT_RANDOM'):
+                    random_weight = random.random()
+                    m['random_weight'] = random_weight * recipe.WEIGHT_RANDOM
+                else:
+                    m['random_weight'] = 0.0
+
+                m['vote_weight'] = vote_weight * recipe.WEIGHT_VOTE
+                m['age_weight'] = age_weight * recipe.WEIGHT_AGE
+
+                weight = (m['index_weight'] + m['vote_weight']
+                          + m['age_weight'] + m['random_weight'])
+                for genre, value in recipe.WEIGHT_GENRE_BIAS.items():
+                    if genre.lower() in m['genres']:
+                        weight *= value
+
+                m['weight'] = weight
+            else:
+                m['vote_weight'] = 0.0
+                m['age_weight'] = 0.0
+                m['weight'] = index_weight
+            item_list[i] = m
+
+        item_list.sort(key = lambda m: m['weight'], reverse=True)
+
+        for i, m in enumerate(item_list):
+            if (i+1) < m['original_idx']:
+                net = Colors.GREEN + u'↑'
+            elif (i+1) > m['original_idx']:
+                net = Colors.RED + u'↓'
+            else:
+                net = u' '
+            net += str(abs(i + 1 - m['original_idx'])).rjust(3)
+            print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
+                "age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
+                "{}{}".format(
+                    net, i+1, m['original_idx'], round(m['index_weight'], 3),
+                    m.get('tmdb_vote'), round(m['vote_weight'], 3), m.get('age'),
+                    round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
+                    round(m['weight'], 3), m['title'], m['year'], Colors.RESET))
+
+        return item_list
 
