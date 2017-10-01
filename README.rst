@@ -71,6 +71,7 @@ Planned features
 * Support for more source lists, including none at all to consider every item in the source libraries.
 * Support for filters based on various criteria like genre, score, language etc.
 * Better release dates for movies and tv shows, maybe pulling from preDB.
+* Support for creating playlists and adding to collections instead of creating new libraries.
 
 Credit
 ------
