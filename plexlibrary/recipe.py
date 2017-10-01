@@ -37,7 +37,7 @@ class Recipe(object):
             raise Exception("Library type should be 'movie' or 'tv'")
 
         # TODO: Support multiple libraries
-        self.source_library_config = self.recipe['source_librares'][0]
+        self.source_library_config = self.recipe['source_libraries'][0]
 
         self.plex = plexutils.Plex(self.config['plex']['baseurl'],
                                    self.config['plex']['token'])
