@@ -1,0 +1,53 @@
+# Supported types: movie, tv
+library_type: 'movie'
+
+# Source list(s)
+source_list_urls:
+  - 'https://api.trakt.tv/users/justin/lists/imdb-top-rated-movies/items/movies'
+
+# Source library details
+source_libraries:
+  - name: 'Movies'
+    folders:
+      - '/path/to/Movies'
+      - '/path/to/More Movies'
+  - name: 'Different Movies'
+    folders:
+      - '/path/to/Different Movies'
+
+# New library details
+new_library:
+  name: 'Movies - IMDB Top 250'
+  folder: '/path/to/symlink/supporting/filesystem/Movies - IMDB Top 250/'
+  sort: yes
+  sort_title:
+    format: '{number}. {title}'
+    visible: yes
+    absolute: yes  # Skips numbers for missing items
+  # Limit the age (in years) of items to be considered
+  # * 0 for no limit
+  max_age: 0
+  # Maximum number of items to keep in the library
+  max_count: 250
+  # Remove items that no longer exist in the source lists
+  remove_from_library: yes
+
+# Weighted sorting (requires TMDb API)
+weighted_sorting:
+  enabled: no
+  better_release_date: no
+  weights:
+    # Think of these as percentages,
+    # but they don't have to add up to 1.0
+    # * Additive
+    # * Higher value -> more important
+    index: 0.0
+    vote: 0.0
+    age: 0.0
+    random: 0.0
+    # Penalize (<0) or reward (>0) certain (TMDb) genres
+    # * Final weight is multipled by these values
+    genre_bias:
+      'TV Movie': 0.7
+      'Animation': 0.95
+
