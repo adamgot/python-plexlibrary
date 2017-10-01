@@ -227,47 +227,34 @@ class Recipe(object):
                     if done:
                         break
                     for part in episode.iterParts():
-                        if done:
-                            break
                         old_path_file = part.file.encode('UTF-8')
                         old_path, file_name = os.path.split(old_path_file)
-                        print old_path, file_name
-                        import pdb;pdb.set_trace()
-                        #old_path = (  # FIXME
-                        #    self.recipe.SOURCE_LIBRARY_FOLDERS[0]
-                        #    + '/'
-                        #    + old_path.replace(
-                        #        self.recipe.SOURCE_LIBRARY_FOLDERS[0],
-                        #        ''
-                        #      ).strip('/').split('/')[0])
 
                         folder_name = ''
                         for f in self.source_library_config['folders']:
                             if old_path.lower().startswith(f.lower()):
+                                old_path = os.path.join(f, old_path.replace(
+                                    f, '').strip(os.sep).split(os.sep)[0])
                                 folder_name = os.path.relpath(old_path, f)
 
                         new_path = os.path.join(self.recipe['new_library']['folder'], folder_name)
-                        dir = True
 
-                        if ((dir and not os.path.exists(new_path))
-                                or (not dir and not os.path.isfile(new_path))):
+                        if not os.path.exists(new_path):
                             try:
                                 if os.name == 'nt':
-                                    if dir:
-                                        subprocess.call(['mklink', '/D', new_path, old_path], shell=True)
-                                    else:
-                                        subprocess.call(['mklink', new_path, old_path_file], shell=True)
+                                    subprocess.call(['mklink', '/D', new_path, old_path], shell=True)
                                 else:
-                                    if dir:
-                                        os.symlink(old_path, new_path)
-                                    else:
-                                        os.symlink(old_path_file, new_path)
+                                    os.symlink(old_path, new_path)
                                 count += 1
                                 new_items.append(tv_show)
                                 updated_paths.append(new_path)
                                 done = True
+                                break
                             except Exception as e:
                                 print(u"Symlink failed for {path}: {e}".format(path=new_path, e=e))
+                        else:
+                            done = True
+                            break
 
         print(u"Created symlinks for {count} new items:".format(count=count))
         for item in new_items:
@@ -379,6 +366,7 @@ class Recipe(object):
 
                         if (dir and os.path.exists(new_path)) or \
                                 (not dir and os.path.isfile(new_path)):
+                            assert os.path.islink(new_path)
                             try:
                                 if os.name == 'nt':
                                     if dir:
@@ -406,32 +394,32 @@ class Recipe(object):
                                 break
                             old_path_file = part.file.encode('UTF-8')
                             old_path, file_name = os.path.split(old_path_file)
-                            print old_path, file_name
-                            import pdb;pdb.set_trace()
-                            #old_path = TV_LIBRARY_FOLDERS[0] + '/' + old_path.replace(TV_LIBRARY_FOLDERS[0], '').strip('/').split('/')[0]
 
                             folder_name = ''
-                            for f in TV_LIBRARY_FOLDERS:
+                            for f in self.source_library_config['folders']:
                                 if old_path.lower().startswith(f.lower()):
+                                    old_path = os.path.join(f, old_path.replace(
+                                        f, '').strip(os.sep).split(os.sep)[0])
                                     folder_name = os.path.relpath(old_path, f)
 
                             new_path = os.path.join(self.recipe['new_library']['folder'], folder_name)
-                            dir = True
-
-                            if (dir and os.path.exists(new_path)) or (not dir and os.path.isfile(new_path)):
+                            if os.path.exists(new_path):
+                                assert os.path.islink(new_path)
                                 try:
                                     if os.name == 'nt':
-                                        if dir:
-                                            os.rmdir(new_path)
-                                        else:
-                                            os.remove(new_path)
+                                        os.rmdir(new_path)
                                     else:
                                         os.unlink(new_path)
                                     count += 1
                                     deleted_items.append(tv_show)
                                     updated_paths.append(new_path)
+                                    done = True
+                                    break
                                 except Exception as e:
                                     print(u"Remove symlink failed for {path}: {e}".format(path=new_path, e=e))
+                            else:
+                                done = True
+                                break
 
             print(u"Removed symlinks for {count} items.".format(count=count))
             for item in deleted_items:
