@@ -4,13 +4,13 @@ from yaml import Loader, SafeLoader
 
 
 class Colors(object):
-    RED  = "\033[1;31m"
-    BLUE = "\033[1;34m"
-    CYAN = "\033[1;36m"
-    GREEN = "\033[0;32m"
-    RESET = "\033[0;0m"
-    BOLD = "\033[;1m"
-    REVERSE = "\033[;7m"
+    RED  = u'\033[1;31m'
+    BLUE = u'\033[1;34m'
+    CYAN = u'\033[1;36m'
+    GREEN = u'\033[0;32m'
+    RESET = u'\033[0;0m'
+    BOLD = u'\033[;1m'
+    REVERSE = u'\033[;7m'
 
 
 class YAMLBase(object):

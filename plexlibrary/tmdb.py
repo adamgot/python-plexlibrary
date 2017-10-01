@@ -23,7 +23,7 @@ class TMDb(object):
 
         # Use cache
         cache = shelve.open(cache_file)
-        if cache.has_key(str(tmdb_id)):
+        if str(tmdb_id) in cache:
             item = cache[str(tmdb_id)]
             cache.close()
             return item.get('imdb_id')
@@ -63,7 +63,7 @@ class TMDb(object):
 
         # Use cache
         cache = shelve.open(self.cache_file)
-        if (cache.has_key(str(tmdb_id)) and
+        if (str(tmdb_id) in cache and
                 (cache[str(tmdb_id)]['cached'] + 3600 * 24)
                  > int(time.time())):
             item = cache[str(tmdb_id)]

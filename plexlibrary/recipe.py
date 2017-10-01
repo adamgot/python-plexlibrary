@@ -170,20 +170,20 @@ class Recipe(object):
         if self.library_type == 'movie':
             for movie in matching_items:
                 for part in movie.iterParts():
-                    old_path_file = part.file.encode('UTF-8')
+                    old_path_file = part.file
                     old_path, file_name = os.path.split(old_path_file)
 
                     folder_name = ''
                     for f in self.source_library_config['folders']:
-                        f = os.path.abspath(f).encode('utf8')
+                        f = os.path.abspath(f)
                         if old_path.lower().startswith(f.lower()):
                             folder_name = os.path.relpath(old_path, f)
 
                     if folder_name == '.':
-                        new_path = os.path.join(self.recipe['new_library']['folder'].encode('utf8'), file_name)
+                        new_path = os.path.join(self.recipe['new_library']['folder'], file_name)
                         dir = False
                     else:
-                        new_path = os.path.join(self.recipe['new_library']['folder'].encode('utf8'), folder_name)
+                        new_path = os.path.join(self.recipe['new_library']['folder'], folder_name)
                         dir = True
                         parent_path = os.path.dirname(os.path.abspath(new_path))
                         if not os.path.exists(parent_path):
@@ -229,7 +229,7 @@ class Recipe(object):
                     if done:
                         break
                     for part in episode.iterParts():
-                        old_path_file = part.file.encode('UTF-8')
+                        old_path_file = part.file
                         old_path, file_name = os.path.split(old_path_file)
 
                         folder_name = ''
@@ -354,7 +354,7 @@ class Recipe(object):
             if self.library_type == 'movie':
                 for movie in imdb_map.values():
                     for part in movie.iterParts():
-                        old_path_file = part.file.encode('UTF-8')
+                        old_path_file = part.file
                         old_path, file_name = os.path.split(old_path_file)
 
                         folder_name = os.path.relpath(old_path, self.recipe['new_library']['folder'])
@@ -394,7 +394,7 @@ class Recipe(object):
                         for part in episode.iterParts():
                             if done:
                                 break
-                            old_path_file = part.file.encode('UTF-8')
+                            old_path_file = part.file
                             old_path, file_name = os.path.split(old_path_file)
 
                             folder_name = ''
@@ -697,12 +697,12 @@ class Recipe(object):
                 net = u' '
             net += str(abs(i + 1 - m['original_idx'])).rjust(3)
             print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
-                "age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
-                "{}{}".format(
+                u"age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
+                u"{}{}".format(
                     net, i+1, m['original_idx'], round(m['index_weight'], 3),
-                    m.get('tmdb_vote'), round(m['vote_weight'], 3), m.get('age'),
+                    m.get('tmdb_vote', 0.0), round(m['vote_weight'], 3), m.get('age', 0),
                     round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
-                    round(m['weight'], 3), m['title'], m['year'], Colors.RESET))
+                    round(m['weight'], 3), str(m['title']), str(m['year']), Colors.RESET))
 
         return item_list
 
