@@ -70,3 +70,7 @@ Planned features
 * Support for filters based on various criteria like genre, score, language etc.
 * Better release dates for movies and tv shows, maybe pulling from preDB.
 
+Credit
+------
+Original functionality is based on https://gist.github.com/JonnyWong16/f5b9af386ea58e19bf18c09f2681df23
+
