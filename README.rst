@@ -57,7 +57,7 @@ for details on how to use the utility.
 
 lists available recipes.
 
-To run a recipe named "movies_trending:, run:
+To run a recipe named "movies_trending", run:
 
 .. code-block:: shell
 
