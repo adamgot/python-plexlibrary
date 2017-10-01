@@ -66,6 +66,7 @@ To run a recipe named "movies_trending", run:
 Planned features
 ----------------
 * PEP8 compliance, and still lots of restructuring to be done.
+* Proper logging.
 * Support for multiple source libraries
 * Support for more source lists, including none at all to consider every item in the source libraries.
 * Support for filters based on various criteria like genre, score, language etc.
