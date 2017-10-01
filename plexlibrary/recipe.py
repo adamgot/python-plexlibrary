@@ -89,8 +89,10 @@ class Recipe(object):
         except:
             print(u"The '{library}' library does not exist in Plex.".format(
                 library=self.source_library_config['name']))
-            print(u"Exiting script.")
-            return 0
+
+        # FIXME: Hack until a new plexapi version is released. 3.0.4?
+        if 'guid' not in source_library.ALLOWED_FILTERS:
+            source_library.ALLOWED_FILTERS += ('guid',)
 
         # Create a list of matching items
         matching_items = []
