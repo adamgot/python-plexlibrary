@@ -25,9 +25,9 @@ class Plex(object):
             params['agent'] = 'com.plexapp.agents.imdb'
             params['scanner'] = 'Plex Movie Scanner'
         elif library_type == 'tv':
-            params['type'] = 'tv'
-            params['agent'] = 'com.plexapp.agents.tvdb'  # FIXME?
-            params['scanner'] = 'TheTVDB'
+            params['type'] = 'show'
+            params['agent'] = 'com.plexapp.agents.thetvdb'
+            params['scanner'] = 'Plex Series Scanner'
         else:
             raise Exception("Library type should be 'movie' or 'tv'")
 
