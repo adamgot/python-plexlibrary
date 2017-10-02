@@ -30,9 +30,9 @@ def get_recipes(directory=None):
         directory = os.path.join(parent_dir, 'recipes')
 
     recipes = []
-    for path in glob.glob(directory + '/*.yml'):
+    for path in glob.glob(os.path.join(directory, '*.yml')):
         d, filename = os.path.split(path)
-        recipe_name = filename.strip('.yml')
+        recipe_name = os.path.splitext(filename)[0]
         recipes.append(recipe_name)
     recipes.sort()
 
