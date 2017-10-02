@@ -52,11 +52,11 @@ Getting started
 
 4. Copy config-template.yml to config.yml and edit it with your information.
 
-  a. Here's a guide if you're unfamiliar with YAML syntax. Most notably you need to use spaces instead of tabs! http://docs.ansible.com/ansible/latest/YAMLSyntax.html
+  * Here's a guide if you're unfamiliar with YAML syntax. Most notably you need to use spaces instead of tabs! http://docs.ansible.com/ansible/latest/YAMLSyntax.html
 
 5. Check out the recipe examples under recipes/examples. Copy an example to recipes/ and edit it with the appropriate information.
 
-  b. Note: multiple source libraries are currently not supported https://github.com/adamgot/python-plexlibrary/issues/4
+  * Note: multiple source libraries are currently not supported https://github.com/adamgot/python-plexlibrary/issues/4
 
 Usage
 -----
