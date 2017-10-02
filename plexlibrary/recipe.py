@@ -87,7 +87,7 @@ class Recipe(object):
             source_library = self.plex.server.library.section(
                 self.source_library_config['name'])
         except:
-            raise Exception("The '{library}' does not exist".format(
+            raise Exception("The '{library}' library does not exist".format(
                 library=self.source_library_config['name']))
 
         # FIXME: Hack until a new plexapi version is released. 3.0.4?
