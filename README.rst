@@ -17,21 +17,32 @@ This is still a work in progress, so major changes may occur in new versions.
 Requirements
 ------------
 * You need a trakt.tv account and an API app: https://trakt.tv/oauth/applications/new
+
 * (optional) The Movie Database API
+
     * https://developers.themoviedb.org/3/getting-started
+    
     * Required for fetching scores, release dates etcetera, for weighted sorting 
+    
     * Required for matching any library items that use the TMDb agent with the items from the lists (if those items do not include a TMDb ID)
+    
     * Shouldn't be necessary for Trakt, as those usually all have TMDb IDs.
+
 * (optional) TheTVDB API
+
     * https://www.thetvdb.com/?tab=apiregister
+    
     * Required for matching any library items that use the TheTVDB agent with the items from the lists (if those items do not include a TheTVDB ID)
+    
     * Shouldn't be necessary for Trakt, as those usually all have TVDB IDs.
 
 Getting started
 ---------------
 
 1. Clone or download this repo.
+
 2. Install Python and pip if you haven't already.
+
 3. Install the requirements:
 
    .. code-block:: shell
@@ -39,6 +50,7 @@ Getting started
        pip install -r requirements.txt
 
 4. Copy config-template.yml to config.yml and edit it with your information.
+
 5. Check out the recipe examples under recipes/examples. Copy an example to recipes/ and edit it with the appropriate information.
 
     * Note: multiple source libraries are currently not supported https://github.com/adamgot/python-plexlibrary/issues/4
