@@ -6,6 +6,7 @@ import datetime
 import os
 import random
 import subprocess
+import sys
 import time
 
 import plexutils
@@ -368,14 +369,17 @@ class Recipe(object):
 
                         if (dir and os.path.exists(new_path)) or \
                                 (not dir and os.path.isfile(new_path)):
-                            assert os.path.islink(new_path)
                             try:
                                 if os.name == 'nt':
+                                    # Python 3.2+ only
+                                    if sys.version_info < (3, 2):
+                                        assert os.path.islink(new_path)
                                     if dir:
                                         os.rmdir(new_path)
                                     else:
                                         os.remove(new_path)
                                 else:
+                                    assert os.path.islink(new_path)
                                     os.unlink(new_path)
                                 count += 1
                                 deleted_items.append(movie)
@@ -406,11 +410,14 @@ class Recipe(object):
 
                             new_path = os.path.join(self.recipe['new_library']['folder'], folder_name)
                             if os.path.exists(new_path):
-                                assert os.path.islink(new_path)
                                 try:
                                     if os.name == 'nt':
+                                        # Python 3.2+ only
+                                        if sys.version_info < (3, 2):
+                                            assert os.path.islink(new_path)
                                         os.rmdir(new_path)
                                     else:
+                                        assert os.path.islink(new_path)
                                         os.unlink(new_path)
                                     count += 1
                                     deleted_items.append(tv_show)
