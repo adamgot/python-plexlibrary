@@ -703,13 +703,17 @@ class Recipe(object):
             else:
                 net = u' '
             net += str(abs(i + 1 - m['original_idx'])).rjust(3)
-            print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
-                u"age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
-                u"{}{}".format(
-                    net, i+1, m['original_idx'], round(m['index_weight'], 3),
-                    m.get('tmdb_vote', 0.0), round(m['vote_weight'], 3), m.get('age', 0),
-                    round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
-                    round(m['weight'], 3), str(m['title']), str(m['year']), Colors.RESET))
+            try:
+                # TODO
+                print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, w_vote:{:0<5}; "
+                    u"age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; w_cmb:{:0<5}; {} "
+                    u"{}{}".format(
+                        net, i+1, m['original_idx'], round(m['index_weight'], 3),
+                        m.get('tmdb_vote', 0.0), round(m['vote_weight'], 3), m.get('age', 0),
+                        round(m['age_weight'], 3), round(m.get('random_weight', 0), 3),
+                        round(m['weight'], 3), str(m['title']), str(m['year']), Colors.RESET))
+            except UnicodeEncodeError:
+                pass
 
         return item_list
 
