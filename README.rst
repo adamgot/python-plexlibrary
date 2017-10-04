@@ -94,5 +94,5 @@ See issues.
 
 Credit
 ------
-Original functionality is based on https://gist.github.com/JonnyWong16/f5b9af386ea58e19bf18c09f2681df23
+Original functionality is based on https://gist.github.com/JonnyWong16/b1aa2c0f604ed92b9b3afaa6db18e5fd
 
