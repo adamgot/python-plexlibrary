@@ -52,7 +52,7 @@ def main():
         list_recipes()
         sys.exit(0)
 
-    if not args.recipe in recipes.get_recipes():
+    if args.recipe not in recipes.get_recipes():
         print("Error: No such recipe")
         list_recipes()
         sys.exit(1)
@@ -61,6 +61,7 @@ def main():
     r.run(args.sort_only)
 
     print("Done!")
+
 
 if __name__ == "__main__":
     main()

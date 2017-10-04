@@ -11,8 +11,8 @@ class RecipeParser(YAMLBase):
         recipe_file = self.name + '.yml'  # TODO support .yaml
         # FIXME?
         if not directory:
-            parent_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__),
-                os.path.pardir)))
+            parent_dir = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), os.path.pardir))
             directory = os.path.join(parent_dir, 'recipes')
 
         filepath = os.path.join(directory, recipe_file)
@@ -25,8 +25,8 @@ class RecipeParser(YAMLBase):
 
 def get_recipes(directory=None):
     if not directory:
-        parent_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__),
-            os.path.pardir)))
+        parent_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), os.path.pardir))
         directory = os.path.join(parent_dir, 'recipes')
 
     recipes = []
@@ -37,4 +37,3 @@ def get_recipes(directory=None):
     recipes.sort()
 
     return recipes
-

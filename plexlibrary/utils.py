@@ -4,7 +4,7 @@ from yaml import Loader, SafeLoader
 
 
 class Colors(object):
-    RED  = u'\033[1;31m'
+    RED = u'\033[1;31m'
     BLUE = u'\033[1;34m'
     CYAN = u'\033[1;36m'
     GREEN = u'\033[0;32m'
@@ -19,11 +19,12 @@ class YAMLBase(object):
         def construct_yaml_str(self, node):
             return self.construct_scalar(node)
         Loader.add_constructor(u'tag:yaml.org,2002:str', construct_yaml_str)
-        SafeLoader.add_constructor(u'tag:yaml.org,2002:str', construct_yaml_str)
+        SafeLoader.add_constructor(u'tag:yaml.org,2002:str',
+                                   construct_yaml_str)
 
         with open(filename, 'r') as f:
             try:
-               self.data = yaml.safe_load(f)
+                self.data = yaml.safe_load(f)
             except yaml.YAMLError as e:
                 raise e
 
@@ -32,4 +33,3 @@ class YAMLBase(object):
 
     def __iter__(self, k):
         return self.data.itervalues()
-

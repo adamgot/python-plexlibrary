@@ -21,20 +21,20 @@ class Trakt(object):
         """
         headers = {'Content-Type': 'application/json',
                    'trakt-api-version': '2'}
-        #self.logger.debug('%s: %s', method, url)
+        # self.logger.debug('%s: %s', method, url)
         headers['trakt-api-key'] = self.client_id
         if oauth:
             headers['Authorization'] = 'Bearer {0}'.format(self.oauth_token)
-        #self.logger.debug('headers: %s', str(headers))
-        #self.logger.debug('method, url :: %s, %s', method, url)
+        # self.logger.debug('headers: %s', str(headers))
+        # self.logger.debug('method, url :: %s, %s', method, url)
         if method == 'get':  # GETs need to pass data as params, not body
             response = requests.request(method, url, params=data,
                                         headers=headers)
         else:
             response = requests.request(method, url, data=json.dumps(data),
                                         headers=headers)
-        #self.logger.debug('RESPONSE [%s] (%s): %s',
-        #    method, url, str(response))
+        # self.logger.debug('RESPONSE [%s] (%s): %s',
+        #     method, url, str(response))
         if response.status_code in self.trakt_core.error_map:
             raise self.trakt_core.error_map[response.status_code]()
         elif response.status_code == 204:  # HTTP no content
@@ -101,11 +101,11 @@ class Trakt(object):
 
         return (show_list, show_ids)
 
-    def add_items(self, item_type, url, item_list=None, item_ids=None, max_age=0):
+    def add_items(self, item_type, url, item_list=None, item_ids=None,
+                  max_age=0):
         if item_type == 'movie':
             return self.add_movies(url, movie_list=item_list,
                                    movie_ids=item_ids, max_age=max_age)
         elif item_type == 'tv':
             return self.add_shows(url, show_list=item_list,
                                   show_ids=item_ids, max_age=max_age)
-

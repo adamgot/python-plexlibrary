@@ -2,6 +2,7 @@
 import plexapi.server
 import requests
 
+
 class Plex(object):
     def __init__(self, baseurl, token):
         self.baseurl = baseurl
@@ -35,7 +36,7 @@ class Plex(object):
         requests.post(url, headers=headers, params=params)
 
     def set_sort_title(self, library_key, rating_key, number, title,
-            library_type, title_format, visible=False):
+                       library_type, title_format, visible=False):
         headers = {'X-Plex-Token': self.token}
         if library_type == 'movie':
             search_type = 1
@@ -60,4 +61,3 @@ class Plex(object):
         url = "{base_url}/library/sections/{library}/all".format(
                 base_url=self.baseurl, library=library_key)
         requests.put(url, headers=headers, params=params)
-

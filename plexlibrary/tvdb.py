@@ -4,6 +4,7 @@ import requests
 
 class TheTVDB(object):
     token = None
+
     def __init__(self, username, api_key, user_key):
         self.username = username
         self.api_key = api_key
@@ -14,7 +15,8 @@ class TheTVDB(object):
         if not self.token:
             self._refresh_token()
 
-        url = "https://api.thetvdb.com/series/{tvdb_id}".format(tvdb_id=tvdb_id)
+        url = "https://api.thetvdb.com/series/{tvdb_id}".format(
+            tvdb_id=tvdb_id)
         headers = {
             'Authorization': 'Bearer {token}'.format(token=self.token)
         }
@@ -41,4 +43,3 @@ class TheTVDB(object):
             self.token = result['token']
         else:
             return None
-

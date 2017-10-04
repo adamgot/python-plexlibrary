@@ -10,6 +10,7 @@ class TMDb(object):
     api_key = None
     cache_file = None
     request_count = 0
+
     def __init__(self, api_key, cache_file=None):
         self.api_key = api_key
         if cache_file:
@@ -42,8 +43,8 @@ class TMDb(object):
             url = "https://api.themoviedb.org/3/movie/{tmdb_id}".format(
                 tmdb_id=tmdb_id)
         else:
-            url = "https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids".format(
-                tmdb_id=tmdb_id)
+            url = ("https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids"
+                   .format(tmdb_id=tmdb_id))
         r = requests.get(url, params=params)
 
         self.request_count += 1
@@ -65,7 +66,7 @@ class TMDb(object):
         cache = shelve.open(self.cache_file)
         if (str(tmdb_id) in cache and
                 (cache[str(tmdb_id)]['cached'] + 3600 * 24)
-                 > int(time.time())):
+                > int(time.time())):
             item = cache[str(tmdb_id)]
             cache.close()
             return item
@@ -99,4 +100,3 @@ class TMDb(object):
             return item
         else:
             return None
-
