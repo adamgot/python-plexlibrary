@@ -458,7 +458,6 @@ class Recipe(object):
         item_list = []
         item_ids = []
         force_imdb_id_match = False
-        curyear = datetime.datetime.now().year
 
         # Get the trakt lists
         for url in self.recipe['source_list_urls']:
@@ -655,7 +654,6 @@ class Recipe(object):
                 tmdb_votes.append(m['tmdb_vote'])
             total_tmdb_vote += m['tmdb_vote']
             item_list[i] = m
-        average_tmdb_vote = total_tmdb_vote / float(total_items)
 
         tmdb_votes.sort()
 

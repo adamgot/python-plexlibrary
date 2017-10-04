@@ -67,8 +67,6 @@ class Trakt(object):
             movie_ids.append(m['movie']['ids']['imdb'])
             if m['movie']['ids'].get('tmdb'):
                 movie_ids.append('tmdb' + str(m['movie']['ids']['tmdb']))
-            else:
-                force_imdb_id_match = True
 
         return (movie_list, movie_ids)
 
@@ -98,12 +96,8 @@ class Trakt(object):
             show_ids.append(m['show']['ids']['imdb'])
             if m['show']['ids'].get('tmdb'):
                 show_ids.append('tmdb' + str(m['show']['ids']['tmdb']))
-            else:
-                force_imdb_id_match = True
             if m['show']['ids'].get('tvdb'):
                 show_ids.append('tvdb' + str(m['show']['ids']['tvdb']))
-            else:
-                force_imdb_id_match = True
 
         return (show_list, show_ids)
 

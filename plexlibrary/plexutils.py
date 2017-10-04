@@ -32,7 +32,7 @@ class Plex(object):
             raise Exception("Library type should be 'movie' or 'tv'")
 
         url = '{base_url}/library/sections'.format(base_url=self.baseurl)
-        r = requests.post(url, headers=headers, params=params)
+        requests.post(url, headers=headers, params=params)
 
     def set_sort_title(self, library_key, rating_key, number, title,
             library_type, title_format, visible=False):
@@ -59,4 +59,5 @@ class Plex(object):
 
         url = "{base_url}/library/sections/{library}/all".format(
                 base_url=self.baseurl, library=library_key)
-        r = requests.put(url, headers=headers, params=params)
+        requests.put(url, headers=headers, params=params)
+
