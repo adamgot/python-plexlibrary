@@ -7,6 +7,7 @@ import requests
 class TheTVDB(object):
     token = None
     def __init__(self, username, api_key, user_key):
+        self.username = username
         self.api_key = api_key
         self.user_key = user_key
 
@@ -29,9 +30,9 @@ class TheTVDB(object):
 
     def _refresh_token(self):
         data = {
-            'apikey': config.TVDB_API_KEY,
-            'userkey': config.TVDB_USER_KEY,
-            'username': config.TVDB_USERNAME,
+            'apikey': self.api_key,
+            'userkey': self.user_key,
+            'username': self.username,
         }
 
         url = "https://api.thetvdb.com/login"
