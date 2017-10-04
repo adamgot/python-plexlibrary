@@ -22,7 +22,7 @@ class TMDb(object):
             raise Exception("Library type should be 'movie' or 'tv'")
 
         # Use cache
-        cache = shelve.open(cache_file)
+        cache = shelve.open(self.cache_file)
         if str(tmdb_id) in cache:
             item = cache[str(tmdb_id)]
             cache.close()
