@@ -61,7 +61,7 @@ class Recipe(object):
                                      self.config['tvdb']['user_key'])
 
     def _run(self):
-        item_list = []
+        item_list = []  # TODO Replace with dict, scrap item_ids?
         item_ids = []
         force_imdb_id_match = False
 
