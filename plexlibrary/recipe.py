@@ -444,12 +444,14 @@ class Recipe(object):
                             old_path, file_name = os.path.split(old_path_file)
 
                             folder_name = ''
-                            for f in self.source_library_config['folders']:
-                                if old_path.lower().startswith(f.lower()):
-                                    old_path = os.path.join(
-                                        f, old_path.replace(f, '').strip(
-                                            os.sep).split(os.sep)[0])
-                                    folder_name = os.path.relpath(old_path, f)
+                            new_library_folder = \
+                                self.recipe['new_library']['folder']
+                            old_path = os.path.join(
+                                new_library_folder,
+                                old_path.replace(new_library_folder, '').strip(
+                                    os.sep).split(os.sep)[0])
+                            folder_name = os.path.relpath(old_path,
+                                                          new_library_folder)
 
                             new_path = os.path.join(
                                 self.recipe['new_library']['folder'],
