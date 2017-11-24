@@ -54,6 +54,8 @@ class Trakt(object):
             # Skip already added movies
             if m['movie']['ids']['imdb'] in movie_ids:
                 continue
+            if not m['movie']['year']:  # TODO: Handle this better?
+                continue
             # Skip old movies
             if max_age != 0 \
                     and (curyear - (max_age - 1)) > int(m['movie']['year']):
@@ -81,6 +83,8 @@ class Trakt(object):
         for m in show_data:
             # Skip already added shows
             if m['show']['ids']['imdb'] in show_ids:
+                continue
+            if not m['show']['year']:
                 continue
             # Skip old shows
             if max_age != 0 \
