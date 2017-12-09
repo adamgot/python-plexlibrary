@@ -685,14 +685,14 @@ class Recipe(object):
         def _get_age_weight(days):
             if self.library_type == 'movie':
                 # Everything younger than this will get 1
-                min_days = 100
+                min_days = 180
                 # Everything older than this will get 0
                 max_days = (float(self.recipe['new_library']['max_age'])
-                            / 4.0 * 365.25 or 200)
+                            / 4.0 * 365.25 or 360)
             else:
                 min_days = 14
                 max_days = (float(self.recipe['new_library']['max_age'])
-                            / 4.0 * 365.25 or 100)
+                            / 4.0 * 365.25 or 180)
             if days <= min_days:
                 return 1
             elif days >= max_days:
