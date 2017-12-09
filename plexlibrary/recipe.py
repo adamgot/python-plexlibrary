@@ -591,6 +591,9 @@ class Recipe(object):
                 imdb_map[m.ratingKey] = m
 
         # Modify the sort titles
+        if not self.recipe['new_library']['sort']:
+            return len(all_new_items)
+
         print(u"Setting the sort titles for the '{}' library...".format(
             self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
