@@ -345,8 +345,9 @@ class Recipe(object):
                 imdb_map[m.ratingKey] = m
 
         # Modify the sort titles
-        print(u"Setting the sort titles for the '{}' library...".format(
-            self.recipe['new_library']['name']))
+        if self.recipe['new_library']['sort']:
+            print(u"Setting the sort titles for the '{}' library...".format(
+                self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
             for i, m in enumerate(item_list):
                 item = imdb_map.pop(m['id'], None)
@@ -356,12 +357,13 @@ class Recipe(object):
                 if not item:
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
                                         None)
-                if item:
+                if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i+1, m['title'],
                         self.library_type,
                         self.recipe['new_library']['sort_title']['format'],
-                        self.recipe['new_library']['sort_title']['visible'])
+                        self.recipe['new_library']['sort_title']['visible']
+                    )
         else:
             i = 0
             for m in item_list:
@@ -372,13 +374,14 @@ class Recipe(object):
                 if not item:
                     item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
                                         None)
-                if item:
+                if item and self.recipe['new_library']['sort']:
                     i += 1
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i, m['title'],
                         self.library_type,
                         self.recipe['new_library']['sort_title']['format'],
-                        self.recipe['new_library']['sort_title']['visible'])
+                        self.recipe['new_library']['sort_title']['visible']
+                    )
 
         if self.recipe['new_library']['remove_from_library']:
             # Remove items from the new library which no longer qualify
@@ -591,9 +594,6 @@ class Recipe(object):
                 imdb_map[m.ratingKey] = m
 
         # Modify the sort titles
-        if not self.recipe['new_library']['sort']:
-            return len(all_new_items)
-
         print(u"Setting the sort titles for the '{}' library...".format(
             self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
