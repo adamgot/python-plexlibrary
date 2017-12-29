@@ -39,7 +39,7 @@ class Recipe(object):
             raise Exception("Library type should be 'movie' or 'tv'")
 
         # TODO: Support multiple libraries
-        self.source_library_config = self.recipe['source_libraries'][0]
+        self.source_library_config = self.recipe['source_libraries']
 
         self.plex = plexutils.Plex(self.config['plex']['baseurl'],
                                    self.config['plex']['token'])
@@ -84,18 +84,22 @@ class Recipe(object):
                       u"for weighted sorting")
 
         # Get list of items from the Plex server
-        print(u"Trying to match with items from the '{}' library ".format(
-            self.source_library_config['name']))
-        try:
-            source_library = self.plex.server.library.section(
-                self.source_library_config['name'])
-        except:
-            raise Exception("The '{library}' library does not exist".format(
-                library=self.source_library_config['name']))
+        source_libraries = []
+        for library_config in self.source_library_config:
+            print(u"Trying to match with items from the '{}' library ".format(
+                library_config['name']))
+            try:
+                source_library = self.plex.server.library.section(
+                    library_config['name'])
+            except:  # FIXME
+                raise Exception("The '{}' library does not exist".format(
+                    library_config['name']))
 
-        # FIXME: Hack until a new plexapi version is released. 3.0.4?
-        if 'guid' not in source_library.ALLOWED_FILTERS:
-            source_library.ALLOWED_FILTERS += ('guid',)
+            # FIXME: Hack until a new plexapi version is released. 3.0.4?
+            if 'guid' not in source_library.ALLOWED_FILTERS:
+                source_library.ALLOWED_FILTERS += ('guid',)
+
+            source_libraries.append(source_library)
 
         # Create a list of matching items
         matching_items = []
@@ -109,13 +113,17 @@ class Recipe(object):
             if max_count > 0 and matching_total >= max_count:
                 nonmatching_idx.append(i)
                 continue
-            res = source_library.search(guid='imdb://' + str(item['id']))
-            if not res and item.get('tmdb_id'):
-                res = source_library.search(
-                    guid='themoviedb://' + str(item['tmdb_id']))
-            if not res and item.get('tvdb_id'):
-                res = source_library.search(
-                    guid='thetvdb://' + str(item['tvdb_id']))
+            res = []
+            for source_library in source_libraries:
+                lres = source_library.search(guid='imdb://' + str(item['id']))
+                if not lres and item.get('tmdb_id'):
+                    lres += source_library.search(
+                        guid='themoviedb://' + str(item['tmdb_id']))
+                if not lres and item.get('tvdb_id'):
+                    lres += source_library.search(
+                        guid='thetvdb://' + str(item['tvdb_id']))
+                if lres:
+                    res += lres
             if not res:
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
@@ -181,57 +189,64 @@ class Recipe(object):
                     old_path, file_name = os.path.split(old_path_file)
 
                     folder_name = ''
-                    for f in self.source_library_config['folders']:
-                        f = os.path.abspath(f)
-                        if old_path.lower().startswith(f.lower()):
-                            folder_name = os.path.relpath(old_path, f)
+                    for library_config in self.source_library_config:
+                        for f in library_config['folders']:
+                            f = os.path.abspath(f)
+                            if old_path.lower().startswith(f.lower()):
+                                folder_name = os.path.relpath(old_path, f)
+                                break
+                        else:
+                            continue
 
-                    if folder_name == '.':
-                        new_path = os.path.join(
-                            self.recipe['new_library']['folder'], file_name)
-                        dir = False
-                    else:
-                        new_path = os.path.join(
-                            self.recipe['new_library']['folder'], folder_name)
-                        dir = True
-                        parent_path = os.path.dirname(
-                            os.path.abspath(new_path))
-                        if not os.path.exists(parent_path):
+                        if folder_name == '.':
+                            new_path = os.path.join(
+                                self.recipe['new_library']['folder'],
+                                file_name)
+                            dir = False
+                        else:
+                            new_path = os.path.join(
+                                self.recipe['new_library']['folder'],
+                                folder_name)
+                            dir = True
+                            parent_path = os.path.dirname(
+                                os.path.abspath(new_path))
+                            if not os.path.exists(parent_path):
+                                try:
+                                    os.makedirs(parent_path)
+                                except OSError as e:
+                                    if e.errno == errno.EEXIST and \
+                                            os.path.isdir(parent_path):
+                                        pass
+                                    else:
+                                        raise
+                            # Clean up old, empty directories
+                            if (os.path.exists(new_path) and not
+                                    os.listdir(new_path)):
+                                os.rmdir(new_path)
+
+                        if (dir and not os.path.exists(new_path)) or \
+                                (not dir and not os.path.isfile(new_path)):
                             try:
-                                os.makedirs(parent_path)
-                            except OSError as e:
-                                if e.errno == errno.EEXIST and \
-                                        os.path.isdir(parent_path):
-                                    pass
+                                if os.name == 'nt':
+                                    if dir:
+                                        subprocess.call(['mklink', '/D',
+                                                        new_path, old_path],
+                                                        shell=True)
+                                    else:
+                                        subprocess.call(['mklink', new_path,
+                                                        old_path_file],
+                                                        shell=True)
                                 else:
-                                    raise
-                        # Clean up old, empty directories
-                        if (os.path.exists(new_path) and not
-                                os.listdir(new_path)):
-                            os.rmdir(new_path)
-
-                    if (dir and not os.path.exists(new_path)) or \
-                            (not dir and not os.path.isfile(new_path)):
-                        try:
-                            if os.name == 'nt':
-                                if dir:
-                                    subprocess.call(['mklink', '/D', new_path,
-                                                     old_path], shell=True)
-                                else:
-                                    subprocess.call(['mklink', new_path,
-                                                    old_path_file],
-                                                    shell=True)
-                            else:
-                                if dir:
-                                    os.symlink(old_path, new_path)
-                                else:
-                                    os.symlink(old_path_file, new_path)
-                            count += 1
-                            new_items.append(movie)
-                            updated_paths.append(new_path)
-                        except Exception as e:
-                            print(u"Symlink failed for {path}: {e}".format(
-                                path=new_path, e=e))
+                                    if dir:
+                                        os.symlink(old_path, new_path)
+                                    else:
+                                        os.symlink(old_path_file, new_path)
+                                count += 1
+                                new_items.append(movie)
+                                updated_paths.append(new_path)
+                            except Exception as e:
+                                print(u"Symlink failed for {path}: {e}".format(
+                                    path=new_path, e=e))
         else:
             for tv_show in matching_items:
                 done = False
@@ -245,33 +260,40 @@ class Recipe(object):
                         old_path, file_name = os.path.split(old_path_file)
 
                         folder_name = ''
-                        for f in self.source_library_config['folders']:
-                            if old_path.lower().startswith(f.lower()):
-                                old_path = os.path.join(f, old_path.replace(
-                                    f, '').strip(os.sep).split(os.sep)[0])
-                                folder_name = os.path.relpath(old_path, f)
+                        for library_config in self.source_library_config:
+                            for f in library_config['folders']:
+                                if old_path.lower().startswith(f.lower()):
+                                    old_path = os.path.join(f,
+                                        old_path.replace(f, '').strip(
+                                            os.sep).split(os.sep)[0])
+                                    folder_name = os.path.relpath(old_path, f)
+                                    break
+                            else:
+                                continue
 
-                        new_path = os.path.join(
-                            self.recipe['new_library']['folder'], folder_name)
+                            new_path = os.path.join(
+                                self.recipe['new_library']['folder'],
+                                folder_name)
 
-                        if not os.path.exists(new_path):
-                            try:
-                                if os.name == 'nt':
-                                    subprocess.call(['mklink', '/D', new_path,
-                                                     old_path], shell=True)
-                                else:
-                                    os.symlink(old_path, new_path)
-                                count += 1
-                                new_items.append(tv_show)
-                                updated_paths.append(new_path)
+                            if not os.path.exists(new_path):
+                                try:
+                                    if os.name == 'nt':
+                                        subprocess.call(['mklink', '/D',
+                                                        new_path, old_path],
+                                                        shell=True)
+                                    else:
+                                        os.symlink(old_path, new_path)
+                                    count += 1
+                                    new_items.append(tv_show)
+                                    updated_paths.append(new_path)
+                                    done = True
+                                    break
+                                except Exception as e:
+                                    print(u"Symlink failed for {path}: {e}"
+                                        .format(path=new_path, e=e))
+                            else:
                                 done = True
                                 break
-                            except Exception as e:
-                                print(u"Symlink failed for {path}: {e}".format(
-                                    path=new_path, e=e))
-                        else:
-                            done = True
-                            break
 
         print(u"Created symlinks for {count} new items:".format(count=count))
         for item in new_items:
