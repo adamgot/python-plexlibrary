@@ -56,8 +56,6 @@ Getting started
 
 5. Check out the recipe examples under recipes/examples. Copy an example to recipes/ and edit it with the appropriate information.
 
-  * Note: multiple source libraries are currently not supported https://github.com/adamgot/python-plexlibrary/issues/4
-
 Usage
 -----
 In the base directory, run:
