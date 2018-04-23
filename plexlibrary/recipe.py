@@ -10,6 +10,8 @@ import subprocess
 import sys
 import time
 
+import plexapi
+
 import plexutils
 import tmdb
 import traktutils
@@ -312,7 +314,7 @@ class Recipe(object):
             print(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
-        except:
+        except plexapi.exceptions.NotFound:
             self.plex.create_new_library(
                 self.recipe['new_library']['name'],
                 self.recipe['new_library']['folder'],
