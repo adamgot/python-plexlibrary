@@ -2,6 +2,10 @@
 import json
 import shelve
 import time
+try:
+    from cPickle import UnpicklingError
+except ImportError:
+    from pickle import UnpicklingError
 
 import requests
 
@@ -25,9 +29,16 @@ class TMDb(object):
         # Use cache
         cache = shelve.open(self.cache_file)
         if str(tmdb_id) in cache:
-            item = cache[str(tmdb_id)]
-            cache.close()
-            return item.get('imdb_id')
+            try:
+                cache_item = cache[str(tmdb_id)]
+            except (EOFError, UnpicklingError):
+                # Cache file error, clear
+                cache.close()
+                cache = shelve.open(self.cache_file, 'n')
+            else:
+                if (cache_item['cached'] + 3600 * 24) > int(time.time()):
+                    cache.close()
+                    return cache_item.get('imdb_id')
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
@@ -64,12 +75,17 @@ class TMDb(object):
 
         # Use cache
         cache = shelve.open(self.cache_file)
-        if (str(tmdb_id) in cache and
-                (cache[str(tmdb_id)]['cached'] + 3600 * 24)
-                > int(time.time())):
-            item = cache[str(tmdb_id)]
-            cache.close()
-            return item
+        if str(tmdb_id) in cache:
+            try:
+                cache_item = cache[str(tmdb_id)]
+            except (EOFError, UnpicklingError):
+                # Cache file error, clear
+                cache.close()
+                cache = shelve.open(self.cache_file, 'n')
+            else:
+                if (cache_item['cached'] + 3600 * 24) > int(time.time()):
+                    cache.close()
+                    return cache_item
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
