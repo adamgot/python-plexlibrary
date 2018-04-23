@@ -33,3 +33,9 @@ class YAMLBase(object):
 
     def __iter__(self, k):
         return self.data.itervalues()
+
+    def get(self, k, default=None):
+        if k in self.data:
+            return self.data[k]
+        else:
+            return default

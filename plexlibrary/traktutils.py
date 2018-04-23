@@ -7,15 +7,29 @@ import trakt
 
 
 class Trakt(object):
-    def __init__(self, username, client_id='', client_secret=''):
+    def __init__(self, username, client_id='', client_secret='',
+                 oauth_token='', oauth=False):
         self.username = username
         self.client_id = client_id
         self.client_secret = client_secret
-        trakt.init(username, client_id=client_id, client_secret=client_secret)
+        self.oauth_token = oauth_token
+        self.oauth = oauth
+        store = False
+        if oauth:
+            if not self.oauth_token:
+                self.oauth_token = trakt.core.oauth_auth(
+                    username, client_id=client_id, client_secret=client_secret,
+                    store=store)
+                # TODO: Write to the file
+                print(u"Add this to the config file under trakt:")
+                print(u"    oauth_token: '{}'".format(self.oauth_token))
+        else:
+            trakt.core.pin_auth(username, client_id=client_id,
+                                client_secret=client_secret)
         self.trakt = trakt
         self.trakt_core = trakt.core.Core()
 
-    def _handle_request(self, method, url, data=None, oauth=False):
+    def _handle_request(self, method, url, data=None):
         """Stolen from trakt.core to support optional OAUTH operations
         :todo: Fix trakt
         """
@@ -23,7 +37,7 @@ class Trakt(object):
                    'trakt-api-version': '2'}
         # self.logger.debug('%s: %s', method, url)
         headers['trakt-api-key'] = self.client_id
-        if oauth:
+        if self.oauth:
             headers['Authorization'] = 'Bearer {0}'.format(self.oauth_token)
         # self.logger.debug('headers: %s', str(headers))
         # self.logger.debug('method, url :: %s, %s', method, url)
@@ -51,6 +65,8 @@ class Trakt(object):
         print(u"Retrieving the trakt list: {}".format(url))
         movie_data = self._handle_request('get', url)
         for m in movie_data:
+            if 'movie' not in m:
+                m['movie'] = m
             # Skip already added movies
             if m['movie']['ids']['imdb'] in movie_ids:
                 continue
@@ -81,6 +97,8 @@ class Trakt(object):
         print(u"Retrieving the trakt list: {}".format(url))
         show_data = self._handle_request('get', url)
         for m in show_data:
+            if 'show' not in m:
+                m['show'] = m
             # Skip already added shows
             if m['show']['ids']['imdb'] in show_ids:
                 continue

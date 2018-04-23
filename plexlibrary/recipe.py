@@ -48,7 +48,11 @@ class Recipe(object):
             self.trakt = traktutils.Trakt(
                 self.config['trakt']['username'],
                 client_id=self.config['trakt']['client_id'],
-                client_secret=self.config['trakt']['client_secret'])
+                client_secret=self.config['trakt']['client_secret'],
+                oauth_token=self.config['trakt'].get('oauth_token', ''),
+                oauth=self.recipe.get('trakt_oauth', False))
+            if self.trakt.oauth_token:
+                self.config['trakt']['oauth_token'] = self.trakt.oauth_token
 
         if self.config['tmdb']['api_key']:
             self.tmdb = tmdb.TMDb(
