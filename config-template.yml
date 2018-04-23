@@ -12,6 +12,7 @@ trakt:
     username: ''
     client_id: ''
     client_secret: ''
+    oauth_token: ''  # Filled in later depending on recipe
 
 # The Movie Database details
 # * Required for fetching scores, release dates etc for weighted sorting
