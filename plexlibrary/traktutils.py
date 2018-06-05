@@ -5,6 +5,7 @@ import json
 import requests
 import trakt
 
+from utils import add_years
 
 class Trakt(object):
     def __init__(self, username, client_id='', client_secret='',
@@ -61,9 +62,12 @@ class Trakt(object):
             movie_list = []
         if not movie_ids:
             movie_ids = []
-        curyear = datetime.datetime.now().year
+        max_date = add_years(max_age * -1)
         print(u"Retrieving the trakt list: {}".format(url))
-        movie_data = self._handle_request('get', url)
+        data = {}
+        if max_age != 0:
+            data['extended'] = 'full'
+        movie_data = self._handle_request('get', url, data=data)
         for m in movie_data:
             if 'movie' not in m:
                 m['movie'] = m
@@ -74,7 +78,8 @@ class Trakt(object):
                 continue
             # Skip old movies
             if max_age != 0 \
-                    and (curyear - (max_age - 1)) > int(m['movie']['year']):
+                    and (max_date > datetime.datetime.strptime(
+                        m['movie']['released'], '%Y-%m-%d')):
                 continue
             movie_list.append({
                 'id': m['movie']['ids']['imdb'],
@@ -95,7 +100,10 @@ class Trakt(object):
             show_ids = []
         curyear = datetime.datetime.now().year
         print(u"Retrieving the trakt list: {}".format(url))
-        show_data = self._handle_request('get', url)
+        data = {}
+        if max_age != 0:
+            data['extended'] = 'full'
+        show_data = self._handle_request('get', url, data=data)
         for m in show_data:
             if 'show' not in m:
                 m['show'] = m

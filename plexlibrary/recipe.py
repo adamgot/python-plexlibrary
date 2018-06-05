@@ -18,7 +18,7 @@ import traktutils
 import tvdb
 from config import ConfigParser
 from recipes import RecipeParser
-from utils import Colors
+from utils import Colors, add_years
 
 
 class Recipe(object):
@@ -411,7 +411,8 @@ class Recipe(object):
                         self.recipe['new_library']['sort_title']['visible']
                     )
 
-        if self.recipe['new_library']['remove_from_library']:
+        if self.recipe['new_library']['remove_from_library'] \
+                or self.recipe['new_library'].get('remove_old', False):
             # Remove items from the new library which no longer qualify
             print(u"Removing symlinks for items "
                   "which no longer qualify ".format(
@@ -419,8 +420,16 @@ class Recipe(object):
             count = 0
             updated_paths = []
             deleted_items = []
+            max_date = add_years((self.recipe['new_library']['max_age'] or 0) \
+                                 * -1)
             if self.library_type == 'movie':
                 for movie in imdb_map.values():
+                    if not self.recipe['new_library']['remove_from_library']:
+                        # Only remove older than max_age
+                        if not self.recipe['new_library']['max_age'] \
+                                or (max_date < movie.originallyAvailableAt):
+                            continue
+
                     for part in movie.iterParts():
                         old_path_file = part.file
                         old_path, file_name = os.path.split(old_path_file)

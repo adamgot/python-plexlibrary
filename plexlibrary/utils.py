@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 import yaml
 from yaml import Loader, SafeLoader
 
@@ -39,3 +41,14 @@ class YAMLBase(object):
             return self.data[k]
         else:
             return default
+
+
+def add_years(years, from_date=None):
+    if from_date is None:
+        from_date = datetime.now()
+    try:
+        return from_date.replace(year=from_date.year + years)
+    except ValueError:
+        # Must be 2/29!
+        return from_date.replace(month=2, day=28,
+                                 year=from_date.year + years)
