@@ -5,30 +5,39 @@ import json
 import requests
 import trakt
 
+from config import ConfigParser
 from utils import add_years
+
 
 class Trakt(object):
     def __init__(self, username, client_id='', client_secret='',
-                 oauth_token='', oauth=False):
+                 oauth_token='', oauth=False, config=None):
+        self.config = config
         self.username = username
         self.client_id = client_id
         self.client_secret = client_secret
         self.oauth_token = oauth_token
         self.oauth = oauth
-        store = False
         if oauth:
             if not self.oauth_token:
-                self.oauth_token = trakt.core.oauth_auth(
-                    username, client_id=client_id, client_secret=client_secret,
-                    store=store)
-                # TODO: Write to the file
-                print(u"Add this to the config file under trakt:")
-                print(u"    oauth_token: '{}'".format(self.oauth_token))
+                self.oauth_auth()
         else:
             trakt.core.pin_auth(username, client_id=client_id,
                                 client_secret=client_secret)
         self.trakt = trakt
         self.trakt_core = trakt.core.Core()
+
+    def oauth_auth(self):
+        store = False
+        self.oauth_token = trakt.core.oauth_auth(
+            self.username, client_id=self.client_id,
+            client_secret=self.client_secret, store=store)
+        # Write to the file
+        if self.config:
+            self.config['trakt']['oauth_token'] = self.oauth_token
+            self.config.save()
+            print(u"Added new OAuth token to the config file under trakt:")
+            print(u"    oauth_token: '{}'".format(self.oauth_token))
 
     def _handle_request(self, method, url, data=None):
         """Stolen from trakt.core to support optional OAUTH operations
@@ -51,6 +60,12 @@ class Trakt(object):
         # self.logger.debug('RESPONSE [%s] (%s): %s',
         #     method, url, str(response))
         if response.status_code in self.trakt_core.error_map:
+            if response.status_code == \
+                    trakt.core.errors.OAuthException.http_code:
+                # OAuth token probably expired
+                print(u"Trakt OAuth token invalid/expired")
+                self.oauth_auth()
+                return self._handle_request(method, url, data)
             raise self.trakt_core.error_map[response.status_code]()
         elif response.status_code == 204:  # HTTP no content
             return None

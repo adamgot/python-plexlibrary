@@ -2,4 +2,4 @@
 plexapi
 requests
 trakt
-pyyaml
+ruamel.yaml

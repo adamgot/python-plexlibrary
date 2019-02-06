@@ -51,7 +51,8 @@ class Recipe(object):
                 client_id=self.config['trakt']['client_id'],
                 client_secret=self.config['trakt']['client_secret'],
                 oauth_token=self.config['trakt'].get('oauth_token', ''),
-                oauth=self.recipe.get('trakt_oauth', False))
+                oauth=self.recipe.get('trakt_oauth', False),
+                config=self.config)
             if self.trakt.oauth_token:
                 self.config['trakt']['oauth_token'] = self.trakt.oauth_token
 
