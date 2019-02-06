@@ -1,6 +1,6 @@
 # Supported types: movie, tv
 library_type: 'movie'
-trakt_oauth: yes  # Note: has to be run manually for the first time to generate a token which needs to be added to the config file
+trakt_oauth: true  # Note: has to be run manually for the first time to generate a token which needs to be added to the config file
 
 # Source list(s)
 source_list_urls:
@@ -21,19 +21,19 @@ source_libraries:
 new_library:
   name: 'Movies - Recommended'
   folder: '/path/to/symlink/supporting/filesystem/Movies - Recommended/'
-  sort: yes
+  sort: true
   sort_title:
     format: '{number}. {title}'
-    visible: no
-    absolute: no
+    visible: false
+    absolute: false
   max_age: 0
   max_count: 100
-  remove_from_library: yes
+  remove_from_library: true
 
 # Weighted sorting (requires TMDb API)
 weighted_sorting:
-  enabled: no
-  better_release_date: no
+  enabled: false
+  better_release_date: false
   weights:
     index: 0.0
     vote: 0.0
