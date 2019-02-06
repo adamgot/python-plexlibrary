@@ -12,7 +12,7 @@ class Plex(object):
                 baseurl=baseurl, token=token)
         except:
             raise Exception("No Plex server found at: {base_url}".format(
-                base_url=self.config['plex']['baseurl']))
+                base_url=baseurl))
 
     def create_new_library(self, name, folder, library_type='movie'):
         headers = {"X-Plex-Token": self.token}
