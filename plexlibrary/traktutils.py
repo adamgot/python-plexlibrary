@@ -5,7 +5,6 @@ import json
 import requests
 import trakt
 
-from config import ConfigParser
 from utils import add_years
 
 
@@ -106,7 +105,7 @@ class Trakt(object):
             if m['movie']['ids'].get('tmdb'):
                 movie_ids.append('tmdb' + str(m['movie']['ids']['tmdb']))
 
-        return (movie_list, movie_ids)
+        return movie_list, movie_ids
 
     def add_shows(self, url, show_list=None, show_ids=None, max_age=0):
         if not show_list:
@@ -144,7 +143,7 @@ class Trakt(object):
             if m['show']['ids'].get('tvdb'):
                 show_ids.append('tvdb' + str(m['show']['ids']['tvdb']))
 
-        return (show_list, show_ids)
+        return show_list, show_ids
 
     def add_items(self, item_type, url, item_list=None, item_ids=None,
                   max_age=0):
