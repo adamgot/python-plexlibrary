@@ -158,11 +158,13 @@ class TMDb(object):
             item['cached'] = int(time.time())
 
             if library_type == 'movie':
-                cache[str(imdb_id)] = item.get('movie_results')[0]
+                if item and item.get('movie_results'):
+                    cache[str(imdb_id)] = item.get('movie_results')[0]
                 cache.close()
                 return item.get('movie_results')[0] if item and item.get('movie_results') else None
 
-            cache[str(imdb_id)] = item.get('tv_results')[0]
+            if item and item.get('tv_results'):
+                cache[str(imdb_id)] = item.get('tv_results')[0]
             cache.close()
             return item.get('tv_results')[0] if item and item.get('tv_results') else None
         else:
