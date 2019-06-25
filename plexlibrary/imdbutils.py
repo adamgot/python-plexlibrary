@@ -34,7 +34,7 @@ class IMDb(object):
         print(u"Retrieving the IMDB list: {}".format(url))
 
         (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
-        for i, imdb_id in enumerate(movie_ids):
+        for i, imdb_id in enumerate(imdb_ids):
             # Skip already added movies
             if imdb_id in movie_ids:
                 continue
