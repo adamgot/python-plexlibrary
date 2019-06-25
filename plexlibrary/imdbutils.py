@@ -74,7 +74,7 @@ class IMDb(object):
 
             tvdb_data = self.tvdb.get_tvdb_from_imdb(id)
             tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'tv')
-            if tvdb_data['firstAired'] != "":
+            if tvdb_data and tvdb_data['firstAired'] != "":
                 year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
             else:
                 year = datetime.datetime.strptime(tmdb_data['first_air_date'], '%Y-%m-%d').year
@@ -85,8 +85,8 @@ class IMDb(object):
                 continue
             show_list.append({
                 'id': id,
-                'tmdb_id': tvdb_data['id'],
-                'tvdb_id': tmdb_data['id'],
+                'tmdb_id': tvdb_data['id'] if tvdb_data else None,
+                'tvdb_id': tmdb_data['id'] if tmdb_data else None,
                 'title': tvdb_data['seriesName'],
                 'year': year,
             })
