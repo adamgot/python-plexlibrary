@@ -117,7 +117,7 @@ class TMDb(object):
         else:
             return None
 
-    def get_tmdb_from_imdb(self, imdb_id, library_type='movie'):
+    def get_tmdb_from_imdb(self, imdb_id, library_type):
         if library_type not in ('movie', 'tv'):
             raise Exception("Library type should be 'movie' or 'tv'")
 
@@ -161,6 +161,7 @@ class TMDb(object):
 
             if library_type == 'movie':
                 return item.get('movie_results')[0]
+
             return item.get('tv_results')[0]
         else:
             return None

@@ -37,7 +37,7 @@ class IMDb(object):
             if id in movie_ids:
                 continue
 
-            tmdb_data = self.tmdb.get_tmdb_from_imdb(id)
+            tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'movie')
 
             date = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d')
 
@@ -73,7 +73,7 @@ class IMDb(object):
                 continue
 
             tvdb_data = self.tvdb.get_tvdb_from_imdb(id)
-            tmdb_data = self.tmdb.get_tmdb_from_imdb(id, library_type='tv')
+            tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'tv')
             if tvdb_data['firstAired'] != "":
                 year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
             else:
