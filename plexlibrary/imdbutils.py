@@ -34,7 +34,7 @@ class IMDb(object):
         print(u"Retrieving the IMDB list: {}".format(url))
 
         (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
-        for i in range(0, movie_ids.count()):
+        for i in range(0, len(movie_ids)):
             id = imdb_ids[i]
             # Skip already added movies
             if id in movie_ids:
@@ -70,7 +70,7 @@ class IMDb(object):
         if max_age != 0:
             data['extended'] = 'full'
         (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
-        for i in range(0, imdb_ids.count()):
+        for i in range(0, len(imdb_ids)):
             id = imdb_ids[i]
             # Skip already added shows
             if id in show_ids:
