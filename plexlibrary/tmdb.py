@@ -153,6 +153,8 @@ class TMDb(object):
 
         self.request_count += 1
 
+        media_result = None
+
         if r.status_code == 200:
             item = json.loads(r.text)
 

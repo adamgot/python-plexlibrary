@@ -34,13 +34,12 @@ class IMDb(object):
         print(u"Retrieving the IMDB list: {}".format(url))
 
         (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
-        for i in range(0, len(movie_ids)):
-            id = imdb_ids[i]
+        for i, imdb_id in enumerate(movie_ids):
             # Skip already added movies
-            if id in movie_ids:
+            if imdb_id in movie_ids:
                 continue
 
-            tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'movie')
+            tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'movie')
 
             date = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d') if tmdb_data else datetime.date(imdb_years[i], 1, 1)
 
@@ -48,7 +47,7 @@ class IMDb(object):
             if max_age != 0 and (max_date > date):
                 continue
             movie_list.append({
-                'id': id,
+                'id': imdb_id,
                 'tmdb_id': tmdb_data['id'] if tmdb_data else None,
                 'title': tmdb_data['title'] if tmdb_data else imdb_titles[i],
                 'year': date.year,
@@ -70,14 +69,13 @@ class IMDb(object):
         if max_age != 0:
             data['extended'] = 'full'
         (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
-        for i in range(0, len(imdb_ids)):
-            id = imdb_ids[i]
+        for i, imdb_id in enumerate(imdb_ids):
             # Skip already added shows
-            if id in show_ids:
+            if imdb_id in show_ids:
                 continue
 
-            tvdb_data = self.tvdb.get_tvdb_from_imdb(id)
-            tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'tv')
+            tvdb_data = self.tvdb.get_tvdb_from_imdb(imdb_id)
+            tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'tv')
             if tvdb_data and tvdb_data['firstAired'] != "":
                 year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
             elif tmdb_data and tmdb_data['first_air_date'] != "":
@@ -90,7 +88,7 @@ class IMDb(object):
                     and (curyear - (max_age - 1)) > year:
                 continue
             show_list.append({
-                'id': id,
+                'id': imdb_id,
                 'tmdb_id': tvdb_data['id'] if tvdb_data else None,
                 'tvdb_id': tmdb_data['id'] if tmdb_data else None,
                 'title': tvdb_data['seriesName'] if tvdb_data else tmdb_data['name'] if tmdb_data else imdb_titles[i],
