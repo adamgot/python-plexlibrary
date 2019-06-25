@@ -76,8 +76,10 @@ class IMDb(object):
             tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'tv')
             if tvdb_data and tvdb_data['firstAired'] != "":
                 year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
-            else:
+            elif tmdb_data and tmdb_data['first_air_date'] != "":
                 year = datetime.datetime.strptime(tmdb_data['first_air_date'], '%Y-%m-%d').year
+            else:
+                year = None
 
             # Skip old shows
             if max_age != 0 \
