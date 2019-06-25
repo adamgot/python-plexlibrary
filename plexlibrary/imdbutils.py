@@ -87,7 +87,7 @@ class IMDb(object):
                 'id': id,
                 'tmdb_id': tvdb_data['id'] if tvdb_data else None,
                 'tvdb_id': tmdb_data['id'] if tmdb_data else None,
-                'title': tvdb_data['seriesName'],
+                'title': tvdb_data['seriesName'] if tvdb_data else tmdb_data['name'],
                 'year': year,
             })
             show_ids.append(id)
