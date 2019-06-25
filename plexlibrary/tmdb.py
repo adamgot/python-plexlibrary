@@ -155,17 +155,17 @@ class TMDb(object):
 
         if r.status_code == 200:
             item = json.loads(r.text)
-            item['cached'] = int(time.time())
 
             if library_type == 'movie':
                 if item and item.get('movie_results'):
-                    cache[str(imdb_id)] = item.get('movie_results')[0]
-                cache.close()
-                return item.get('movie_results')[0] if item and item.get('movie_results') else None
+                    media_result = item.get('movie_results')[0]
+            else:
+                if item and item.get('tv_results'):
+                    media_result = item.get('tv_results')[0]
 
-            if item and item.get('tv_results'):
-                cache[str(imdb_id)] = item.get('tv_results')[0]
-            cache.close()
-            return item.get('tv_results')[0] if item and item.get('tv_results') else None
-        else:
-            return None
+            if media_result:
+                media_result['cached'] = int(time.time())
+                cache[str(imdb_id)] = media_result
+
+        cache.close()
+        return media_result
