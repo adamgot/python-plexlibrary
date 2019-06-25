@@ -77,7 +77,7 @@ class IMDb(object):
             if tvdb_data['firstAired'] != "":
                 year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
             else:
-                year = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d').year
+                year = datetime.datetime.strptime(tmdb_data['first_air_date'], '%Y-%m-%d').year
 
             # Skip old shows
             if max_age != 0 \
