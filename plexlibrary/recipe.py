@@ -15,6 +15,7 @@ import plexapi
 import plexutils
 import tmdb
 import traktutils
+import imdbutils
 import tvdb
 from config import ConfigParser
 from recipes import RecipeParser
@@ -66,6 +67,12 @@ class Recipe(object):
                                      self.config['tvdb']['api_key'],
                                      self.config['tvdb']['user_key'])
 
+        if self.tmdb and self.tvdb:
+            self.imdb = imdbutils.IMDb(
+                self.tmdb,
+                self.tvdb
+            )
+
     def _run(self):
         item_list = []  # TODO Replace with dict, scrap item_ids?
         item_ids = []
@@ -75,6 +82,10 @@ class Recipe(object):
         for url in self.recipe['source_list_urls']:
             if 'api.trakt.tv' in url:
                 (item_list, item_ids) = self.trakt.add_items(
+                    self.library_type, url, item_list, item_ids,
+                    self.recipe['new_library']['max_age'] or 0)
+            elif 'imdb.com/chart' in url:
+                (item_list, item_ids) = self.imdb.add_items(
                     self.library_type, url, item_list, item_ids,
                     self.recipe['new_library']['max_age'] or 0)
             else:

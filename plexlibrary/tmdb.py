@@ -116,3 +116,51 @@ class TMDb(object):
             return item
         else:
             return None
+
+    def get_tmdb_from_imdb(self, imdb_id, library_type='movie'):
+        if library_type not in ('movie', 'tv'):
+            raise Exception("Library type should be 'movie' or 'tv'")
+
+        # Use cache
+        cache = shelve.open(self.cache_file)
+        if str(imdb_id) in cache:
+            try:
+                cache_item = cache[str(imdb_id)]
+            except (EOFError, UnpicklingError):
+                # Cache file error, clear
+                cache.close()
+                cache = shelve.open(self.cache_file, 'n')
+            else:
+                if (cache_item['cached'] + 3600 * 24) > int(time.time()):
+                    cache.close()
+                    return cache_item.get('imdb_id')
+
+        # Wait 10 seconds for the TMDb rate limit
+        if self.request_count >= 40:
+            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            time.sleep(10)
+            self.request_count = 0
+
+        params = {
+            'api_key': self.api_key,
+            'external_source': 'imdb_id'
+        }
+
+        url = "https://api.themoviedb.org/3/find/{imdb_id}".format(
+            imdb_id=imdb_id)
+
+        r = requests.get(url, params=params)
+
+        self.request_count += 1
+
+        if r.status_code == 200:
+            item = json.loads(r.text)
+            item['cached'] = int(time.time())
+            cache[str(imdb_id)] = item
+            cache.close()
+
+            if library_type == 'movie':
+                return item.get('movie_results')[0]
+            return item.get('tv_results')[0]
+        else:
+            return None
