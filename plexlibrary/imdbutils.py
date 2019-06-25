@@ -19,9 +19,11 @@ class IMDb(object):
         tree = html.fromstring(r.content)
 
         # Dict of the IMDB top 250 ids in order
+        titles = tree.xpath("//table[contains(@class, 'chart')]//td[@class='titleColumn']/a/text()")
+        years = tree.xpath("//table[contains(@class, 'chart')]//td[@class='titleColumn']/span/text()")
         ids = tree.xpath("//table[contains(@class, 'chart')]//td[@class='ratingColumn']/div//@data-titleid")
 
-        return ids
+        return ids, titles, years
 
     def add_movies(self, url, movie_list=None, movie_ids=None, max_age=0):
         if not movie_list:
@@ -31,23 +33,24 @@ class IMDb(object):
         max_date = add_years(max_age * -1)
         print(u"Retrieving the IMDB list: {}".format(url))
 
-        movie_data = self._handle_request(url)
-        for id in movie_data:
+        (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
+        for i in range(0, movie_ids.count()):
+            id = imdb_ids[i]
             # Skip already added movies
             if id in movie_ids:
                 continue
 
             tmdb_data = self.tmdb.get_tmdb_from_imdb(id, 'movie')
 
-            date = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d')
+            date = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d') if tmdb_data else datetime.date(imdb_years[i], 1, 1)
 
             # Skip old movies
             if max_age != 0 and (max_date > date):
                 continue
             movie_list.append({
                 'id': id,
-                'tmdb_id': tmdb_data['id'],
-                'title': tmdb_data['title'],
+                'tmdb_id': tmdb_data['id'] if tmdb_data else None,
+                'title': tmdb_data['title'] if tmdb_data else imdb_titles[i],
                 'year': date.year,
             })
             movie_ids.append(id)
@@ -66,8 +69,9 @@ class IMDb(object):
         data = {}
         if max_age != 0:
             data['extended'] = 'full'
-        show_data = self._handle_request(url)
-        for id in show_data:
+        (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
+        for i in range(0, imdb_ids.count()):
+            id = imdb_ids[i]
             # Skip already added shows
             if id in show_ids:
                 continue
@@ -79,7 +83,7 @@ class IMDb(object):
             elif tmdb_data and tmdb_data['first_air_date'] != "":
                 year = datetime.datetime.strptime(tmdb_data['first_air_date'], '%Y-%m-%d').year
             else:
-                year = None
+                year = imdb_years[i]
 
             # Skip old shows
             if max_age != 0 \
@@ -89,7 +93,7 @@ class IMDb(object):
                 'id': id,
                 'tmdb_id': tvdb_data['id'] if tvdb_data else None,
                 'tvdb_id': tmdb_data['id'] if tmdb_data else None,
-                'title': tvdb_data['seriesName'] if tvdb_data else tmdb_data['name'],
+                'title': tvdb_data['seriesName'] if tvdb_data else tmdb_data['name'] if tmdb_data else imdb_titles[i],
                 'year': year,
             })
             show_ids.append(id)
