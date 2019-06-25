@@ -91,9 +91,9 @@ class IMDb(object):
                 'year': year,
             })
             show_ids.append(id)
-            if tmdb_data['id']:
+            if tmdb_data and tmdb_data['id']:
                 show_ids.append('tmdb' + str(tmdb_data['id']))
-            if tvdb_data['id']:
+            if tvdb_data and tvdb_data['id']:
                 show_ids.append('tvdb' + str(tvdb_data['id']))
 
         return show_list, show_ids
