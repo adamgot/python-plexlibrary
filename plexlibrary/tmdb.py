@@ -156,8 +156,6 @@ class TMDb(object):
         if r.status_code == 200:
             item = json.loads(r.text)
             item['cached'] = int(time.time())
-            cache[str(imdb_id)] = item
-            cache.close()
 
             if library_type == 'movie':
                 cache[str(imdb_id)] = item.get('movie_results')[0]
