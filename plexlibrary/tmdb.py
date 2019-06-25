@@ -133,7 +133,7 @@ class TMDb(object):
             else:
                 if (cache_item['cached'] + 3600 * 24) > int(time.time()):
                     cache.close()
-                    return cache_item.get('imdb_id')
+                    return cache_item
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
