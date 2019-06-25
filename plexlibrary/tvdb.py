@@ -63,6 +63,6 @@ class TheTVDB(object):
         if r.status_code == 200:
             item = json.loads(r.text)
 
-            return item.get('data')[0]
+            return item.get('data')[0] if item and item.get('data') else None
         else:
             return None
