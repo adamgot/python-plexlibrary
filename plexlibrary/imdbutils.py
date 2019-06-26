@@ -52,7 +52,7 @@ class IMDb(object):
                 'title': tmdb_data['title'] if tmdb_data else imdb_titles[i],
                 'year': date.year,
             })
-            movie_ids.append(id)
+            movie_ids.append(imdb_id)
             if tmdb_data['id']:
                 movie_ids.append('tmdb' + str(tmdb_data['id']))
 
@@ -89,12 +89,12 @@ class IMDb(object):
                 continue
             show_list.append({
                 'id': imdb_id,
-                'tmdb_id': tvdb_data['id'] if tvdb_data else None,
-                'tvdb_id': tmdb_data['id'] if tmdb_data else None,
+                'tvdb_id': tvdb_data['id'] if tvdb_data else None,
+                'tmdb_id': tmdb_data['id'] if tmdb_data else None,
                 'title': tvdb_data['seriesName'] if tvdb_data else tmdb_data['name'] if tmdb_data else imdb_titles[i],
                 'year': year,
             })
-            show_ids.append(id)
+            show_ids.append(imdb_id)
             if tmdb_data and tmdb_data['id']:
                 show_ids.append('tmdb' + str(tmdb_data['id']))
             if tvdb_data and tvdb_data['id']:
