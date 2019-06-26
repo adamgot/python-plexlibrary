@@ -67,11 +67,7 @@ class Recipe(object):
                                      self.config['tvdb']['api_key'],
                                      self.config['tvdb']['user_key'])
 
-        if self.tmdb and self.tvdb:
-            self.imdb = imdbutils.IMDb(
-                self.tmdb,
-                self.tvdb
-            )
+        self.imdb = imdbutils.IMDb(self.tmdb, self.tvdb)
 
     def _run(self):
         item_list = []  # TODO Replace with dict, scrap item_ids?

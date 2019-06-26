@@ -39,7 +39,8 @@ class IMDb(object):
             if imdb_id in movie_ids:
                 continue
 
-            tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'movie')
+            if self.tmdb:
+                tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'movie')
 
             date = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d') if tmdb_data else datetime.date(imdb_years[i], 1, 1)
 
@@ -74,8 +75,12 @@ class IMDb(object):
             if imdb_id in show_ids:
                 continue
 
-            tvdb_data = self.tvdb.get_tvdb_from_imdb(imdb_id)
-            tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'tv')
+            if self.tvdb:
+                tvdb_data = self.tvdb.get_tvdb_from_imdb(imdb_id)
+
+            if self.tmdb:
+                tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'tv')
+
             if tvdb_data and tvdb_data['firstAired'] != "":
                 year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
             elif tmdb_data and tmdb_data['first_air_date'] != "":
