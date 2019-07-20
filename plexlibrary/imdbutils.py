@@ -100,7 +100,7 @@ class IMDb(object):
             elif imdb_years[i]:
                 year = str(imdb_years[i]).strip("()")
             else:
-                year = 0
+                year = datetime.date.today().year
 
             # Skip old shows
             if max_age != 0 \
