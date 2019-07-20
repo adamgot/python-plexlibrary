@@ -13,7 +13,8 @@ class IMDb(object):
         self.tvdb = tvdb
 
     def _handle_request(self, url):
-        """Stolen from Automated IMDB Top 250 Plex library script by /u/SwiftPanda16
+        """Stolen from Automated IMDB Top 250 Plex library script
+           by /u/SwiftPanda16
         """
         r = requests.get(url)
         tree = html.fromstring(r.content)
