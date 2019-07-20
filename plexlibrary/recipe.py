@@ -213,31 +213,42 @@ class Recipe(object):
 
                         if folder_name == '.':
                             new_path = os.path.join(
-                                self.recipe['new_library']['folder'], file_name)
+                                self.recipe['new_library']['folder'],
+                                file_name)
                             dir = False
                         else:
-                            new_path = os.path.join(self.recipe['new_library']['folder'], folder_name)
+                            new_path = os.path.join(
+                                self.recipe['new_library']['folder'],
+                                folder_name)
                             dir = True
-                            parent_path = os.path.dirname(os.path.abspath(new_path))
+                            parent_path = os.path.dirname(
+                                os.path.abspath(new_path))
                             if not os.path.exists(parent_path):
                                 try:
                                     os.makedirs(parent_path)
                                 except OSError as e:
-                                    if e.errno == errno.EEXIST and os.path.isdir(parent_path):
+                                    if e.errno == errno.EEXIST \
+                                            and os.path.isdir(parent_path):
                                         pass
                                     else:
                                         raise
                             # Clean up old, empty directories
-                            if os.path.exists(new_path) and not os.listdir(new_path):
+                            if os.path.exists(new_path) \
+                                    and not os.listdir(new_path):
                                 os.rmdir(new_path)
 
-                        if (dir and not os.path.exists(new_path)) or not dir and not os.path.isfile(new_path):
+                        if (dir and not os.path.exists(new_path)) \
+                                or not dir and not os.path.isfile(new_path):
                             try:
                                 if os.name == 'nt':
                                     if dir:
-                                        subprocess.call(['mklink', '/D', new_path, old_path], shell=True)
+                                        subprocess.call(['mklink', '/D',
+                                                         new_path, old_path],
+                                                        shell=True)
                                     else:
-                                        subprocess.call(['mklink', new_path, old_path_file], shell=True)
+                                        subprocess.call(['mklink', new_path,
+                                                         old_path_file],
+                                                        shell=True)
                                 else:
                                     if dir:
                                         os.symlink(old_path, new_path)
@@ -247,7 +258,8 @@ class Recipe(object):
                                 new_items.append(movie)
                                 updated_paths.append(new_path)
                             except Exception as e:
-                                print(u"Symlink failed for {path}: {e}".format(path=new_path, e=e))
+                                print(u"Symlink failed for {path}: {e}".format(
+                                    path=new_path, e=e))
         else:
             for tv_show in matching_items:
                 done = False
@@ -265,8 +277,8 @@ class Recipe(object):
                             for f in library_config['folders']:
                                 if old_path.lower().startswith(f.lower()):
                                     old_path = os.path.join(f,
-                                                            old_path.replace(f,
-                                                                             '').strip(
+                                                            old_path.replace(
+                                                                f, '').strip(
                                                                 os.sep).split(
                                                                 os.sep)[0])
                                     folder_name = os.path.relpath(old_path, f)
@@ -281,7 +293,9 @@ class Recipe(object):
                             if not os.path.exists(new_path):
                                 try:
                                     if os.name == 'nt':
-                                        subprocess.call(['mklink', '/D', new_path, old_path], shell=True)
+                                        subprocess.call(['mklink', '/D',
+                                                         new_path, old_path],
+                                                        shell=True)
                                     else:
                                         os.symlink(old_path, new_path)
                                     count += 1
@@ -290,7 +304,8 @@ class Recipe(object):
                                     done = True
                                     break
                                 except Exception as e:
-                                    print(u"Symlink failed for {path}: {e}".format(path=new_path, e=e))
+                                    print(u"Symlink failed for {path}: {e}"
+                                          .format(path=new_path, e=e))
                             else:
                                 done = True
                                 break
@@ -303,7 +318,8 @@ class Recipe(object):
         print(u"Creating the '{}' library in Plex...".format(
             self.recipe['new_library']['name']))
         try:
-            new_library = self.plex.server.library.section(self.recipe['new_library']['name'])
+            new_library = self.plex.server.library.section(
+                self.recipe['new_library']['name'])
             print(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
@@ -413,7 +429,8 @@ class Recipe(object):
             count = 0
             updated_paths = []
             deleted_items = []
-            max_date = add_years((self.recipe['new_library']['max_age'] or 0) * -1)
+            max_date = add_years(
+                (self.recipe['new_library']['max_age'] or 0) * -1)
             if self.library_type == 'movie':
                 for movie in imdb_map.values():
                     if not self.recipe['new_library']['remove_from_library']:
@@ -440,7 +457,8 @@ class Recipe(object):
                                 folder_name)
                             dir = True
 
-                        if (dir and os.path.exists(new_path)) or (not dir and os.path.isfile(new_path)):
+                        if (dir and os.path.exists(new_path)) or (
+                                not dir and os.path.isfile(new_path)):
                             try:
                                 if os.name == 'nt':
                                     # Python 3.2+ only

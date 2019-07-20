@@ -19,9 +19,12 @@ class IMDb(object):
         tree = html.fromstring(r.content)
 
         # Dict of the IMDB top 250 ids in order
-        titles = tree.xpath("//table[contains(@class, 'chart')]//td[@class='titleColumn']/a/text()")
-        years = tree.xpath("//table[contains(@class, 'chart')]//td[@class='titleColumn']/span/text()")
-        ids = tree.xpath("//table[contains(@class, 'chart')]//td[@class='ratingColumn']/div//@data-titleid")
+        titles = tree.xpath("//table[contains(@class, 'chart')]"
+                            "//td[@class='titleColumn']/a/text()")
+        years = tree.xpath("//table[contains(@class, 'chart')]"
+                           "//td[@class='titleColumn']/span/text()")
+        ids = tree.xpath("//table[contains(@class, 'chart')]"
+                         "//td[@class='ratingColumn']/div//@data-titleid")
 
         return ids, titles, years
 
@@ -42,7 +45,11 @@ class IMDb(object):
             if self.tmdb:
                 tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'movie')
 
-            date = datetime.datetime.strptime(tmdb_data['release_date'], '%Y-%m-%d') if tmdb_data else datetime.date(imdb_years[i], 1, 1)
+            if tmdb_data and tmdb_data['release_date']:
+                date = datetime.datetime.strptime(tmdb_data['release_date'],
+                                                  '%Y-%m-%d')
+            else:
+                date = datetime.date(imdb_years[i], 1, 1)
 
             # Skip old movies
             if max_age != 0 and (max_date > date):
@@ -82,9 +89,11 @@ class IMDb(object):
                 tmdb_data = self.tmdb.get_tmdb_from_imdb(imdb_id, 'tv')
 
             if tvdb_data and tvdb_data['firstAired'] != "":
-                year = datetime.datetime.strptime(tvdb_data['firstAired'], '%Y-%m-%d').year
+                year = datetime.datetime.strptime(tvdb_data['firstAired'],
+                                                  '%Y-%m-%d').year
             elif tmdb_data and tmdb_data['first_air_date'] != "":
-                year = datetime.datetime.strptime(tmdb_data['first_air_date'], '%Y-%m-%d').year
+                year = datetime.datetime.strptime(tmdb_data['first_air_date'],
+                                                  '%Y-%m-%d').year
             else:
                 year = imdb_years[i]
 
@@ -92,11 +101,17 @@ class IMDb(object):
             if max_age != 0 \
                     and (curyear - (max_age - 1)) > year:
                 continue
+
+            if tvdb_data:
+                title = tvdb_data['seriesName']
+            else:
+                title = tmdb_data['name'] if tmdb_data else imdb_titles[i]
+
             show_list.append({
                 'id': imdb_id,
                 'tvdb_id': tvdb_data['id'] if tvdb_data else None,
                 'tmdb_id': tmdb_data['id'] if tmdb_data else None,
-                'title': tvdb_data['seriesName'] if tvdb_data else tmdb_data['name'] if tmdb_data else imdb_titles[i],
+                'title': title,
                 'year': year,
             })
             show_ids.append(imdb_id)

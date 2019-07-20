@@ -4,11 +4,12 @@ Python-PlexLibrary
 Python command line utility for creating and maintaining dynamic Plex
 libraries based on "recipes".
 
-E.g. Create a library consisting of all movies or tv shows in a Trakt_
-list that exist in your main library, and set the sort titles
+E.g. Create a library consisting of all movies or tv shows in a Trakt_ list or
+on an IMDb_ chart that exist in your main library, and set the sort titles
 accordingly.
 
 .. _Trakt: https://trakt.tv/
+.. _IMDb: https://imdb.com/
 
 Disclaimer
 ----------
@@ -29,6 +30,8 @@ Requirements
     
   * Shouldn't be necessary for Trakt, as those usually all have TMDb IDs.
 
+  * Required for matching movies and some TV shows sourced from IMDb
+
 * (optional) TheTVDB API
 
   * https://www.thetvdb.com/?tab=apiregister
@@ -36,6 +39,8 @@ Requirements
   * Required for matching any library items that use the TheTVDB agent with the items from the lists (if those items do not include a TheTVDB ID)
     
   * Shouldn't be necessary for Trakt, as those usually all have TVDB IDs.
+
+  * Required for matching TV shows sourced from IMDb
 
 Getting started
 ---------------
