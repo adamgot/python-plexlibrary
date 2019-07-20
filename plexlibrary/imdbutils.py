@@ -48,8 +48,11 @@ class IMDb(object):
             if tmdb_data and tmdb_data['release_date']:
                 date = datetime.datetime.strptime(tmdb_data['release_date'],
                                                   '%Y-%m-%d')
+            elif imdb_years[i]:
+                date = datetime.date(int(str(imdb_years[i]).strip("()")),
+                                     12, 31)
             else:
-                date = datetime.date(imdb_years[i], 1, 1)
+                date = datetime.date.today()
 
             # Skip old movies
             if max_age != 0 and (max_date > date):
@@ -94,8 +97,10 @@ class IMDb(object):
             elif tmdb_data and tmdb_data['first_air_date'] != "":
                 year = datetime.datetime.strptime(tmdb_data['first_air_date'],
                                                   '%Y-%m-%d').year
+            elif imdb_years[i]:
+                year = str(imdb_years[i]).strip("()")
             else:
-                year = imdb_years[i]
+                year = 0
 
             # Skip old shows
             if max_age != 0 \
