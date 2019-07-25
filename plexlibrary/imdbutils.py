@@ -65,7 +65,7 @@ class IMDb(object):
                 'year': date.year,
             })
             movie_ids.append(imdb_id)
-            if tmdb_data['id']:
+            if tmdb_data and tmdb_data['id']:
                 movie_ids.append('tmdb' + str(tmdb_data['id']))
 
         return movie_list, movie_ids
