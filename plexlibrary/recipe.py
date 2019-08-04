@@ -15,6 +15,7 @@ import plexapi
 import plexutils
 import tmdb
 import traktutils
+import imdbutils
 import tvdb
 from config import ConfigParser
 from recipes import RecipeParser
@@ -66,6 +67,8 @@ class Recipe(object):
                                      self.config['tvdb']['api_key'],
                                      self.config['tvdb']['user_key'])
 
+        self.imdb = imdbutils.IMDb(self.tmdb, self.tvdb)
+
     def _run(self):
         item_list = []  # TODO Replace with dict, scrap item_ids?
         item_ids = []
@@ -75,6 +78,10 @@ class Recipe(object):
         for url in self.recipe['source_list_urls']:
             if 'api.trakt.tv' in url:
                 (item_list, item_ids) = self.trakt.add_items(
+                    self.library_type, url, item_list, item_ids,
+                    self.recipe['new_library']['max_age'] or 0)
+            elif 'imdb.com/chart' in url:
+                (item_list, item_ids) = self.imdb.add_items(
                     self.library_type, url, item_list, item_ids,
                     self.recipe['new_library']['max_age'] or 0)
             else:
@@ -220,18 +227,18 @@ class Recipe(object):
                                 try:
                                     os.makedirs(parent_path)
                                 except OSError as e:
-                                    if e.errno == errno.EEXIST and \
-                                            os.path.isdir(parent_path):
+                                    if e.errno == errno.EEXIST \
+                                            and os.path.isdir(parent_path):
                                         pass
                                     else:
                                         raise
                             # Clean up old, empty directories
-                            if (os.path.exists(new_path) and not
-                            os.listdir(new_path)):
+                            if os.path.exists(new_path) \
+                                    and not os.listdir(new_path):
                                 os.rmdir(new_path)
 
-                        if (dir and not os.path.exists(new_path)) or \
-                                (not dir and not os.path.isfile(new_path)):
+                        if (dir and not os.path.exists(new_path)) \
+                                or not dir and not os.path.isfile(new_path):
                             try:
                                 if os.name == 'nt':
                                     if dir:
@@ -270,8 +277,8 @@ class Recipe(object):
                             for f in library_config['folders']:
                                 if old_path.lower().startswith(f.lower()):
                                     old_path = os.path.join(f,
-                                                            old_path.replace(f,
-                                                                             '').strip(
+                                                            old_path.replace(
+                                                                f, '').strip(
                                                                 os.sep).split(
                                                                 os.sep)[0])
                                     folder_name = os.path.relpath(old_path, f)
@@ -422,8 +429,8 @@ class Recipe(object):
             count = 0
             updated_paths = []
             deleted_items = []
-            max_date = add_years((self.recipe['new_library']['max_age'] or 0) \
-                                 * -1)
+            max_date = add_years(
+                (self.recipe['new_library']['max_age'] or 0) * -1)
             if self.library_type == 'movie':
                 for movie in imdb_map.values():
                     if not self.recipe['new_library']['remove_from_library']:
@@ -450,8 +457,8 @@ class Recipe(object):
                                 folder_name)
                             dir = True
 
-                        if (dir and os.path.exists(new_path)) or \
-                                (not dir and os.path.isfile(new_path)):
+                        if (dir and os.path.exists(new_path)) or (
+                                not dir and os.path.isfile(new_path)):
                             try:
                                 if os.name == 'nt':
                                     # Python 3.2+ only
@@ -469,8 +476,7 @@ class Recipe(object):
                                 updated_paths.append(new_path)
                             except Exception as e:
                                 print(u"Remove symlink failed for "
-                                      "{path}: {e}".format(path=new_path,
-                                                           e=e))
+                                      "{path}: {e}".format(path=new_path, e=e))
             else:
                 for tv_show in imdb_map.values():
                     done = False

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import requests
+import json
 
 
 class TheTVDB(object):
@@ -41,5 +42,27 @@ class TheTVDB(object):
         if r.status_code == 200:
             result = r.json()
             self.token = result['token']
+        else:
+            return None
+
+    def get_tvdb_from_imdb(self, imdb_id):
+        # TODO Cache
+        if not self.token:
+            self._refresh_token()
+
+        params = {
+            'imdbId': imdb_id
+        }
+
+        url = "https://api.thetvdb.com/search/series"
+        headers = {
+            'Authorization': 'Bearer {token}'.format(token=self.token)
+        }
+        r = requests.get(url, headers=headers, params=params)
+
+        if r.status_code == 200:
+            item = json.loads(r.text)
+
+            return item.get('data')[0] if item and item.get('data') else None
         else:
             return None
