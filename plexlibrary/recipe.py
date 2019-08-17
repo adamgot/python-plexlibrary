@@ -15,6 +15,7 @@ import plexapi
 import plexutils
 import tmdb
 import traktutils
+import imdbutils
 import tvdb
 from config import ConfigParser
 from recipes import RecipeParser
@@ -51,7 +52,8 @@ class Recipe(object):
                 client_id=self.config['trakt']['client_id'],
                 client_secret=self.config['trakt']['client_secret'],
                 oauth_token=self.config['trakt'].get('oauth_token', ''),
-                oauth=self.recipe.get('trakt_oauth', False))
+                oauth=self.recipe.get('trakt_oauth', False),
+                config=self.config)
             if self.trakt.oauth_token:
                 self.config['trakt']['oauth_token'] = self.trakt.oauth_token
 
@@ -65,6 +67,8 @@ class Recipe(object):
                                      self.config['tvdb']['api_key'],
                                      self.config['tvdb']['user_key'])
 
+        self.imdb = imdbutils.IMDb(self.tmdb, self.tvdb)
+
     def _run(self):
         item_list = []  # TODO Replace with dict, scrap item_ids?
         item_ids = []
@@ -74,6 +78,10 @@ class Recipe(object):
         for url in self.recipe['source_list_urls']:
             if 'api.trakt.tv' in url:
                 (item_list, item_ids) = self.trakt.add_items(
+                    self.library_type, url, item_list, item_ids,
+                    self.recipe['new_library']['max_age'] or 0)
+            elif 'imdb.com/chart' in url:
+                (item_list, item_ids) = self.imdb.add_items(
                     self.library_type, url, item_list, item_ids,
                     self.recipe['new_library']['max_age'] or 0)
             else:
@@ -144,8 +152,8 @@ class Recipe(object):
                     tmdb_id = r.guid.split('themoviedb://')[1].split('?')[0]
                 elif r.guid is not None and 'thetvdb://' in r.guid:
                     tvdb_id = (r.guid.split('thetvdb://')[1]
-                               .split('?')[0]
-                               .split('/')[0])
+                        .split('?')[0]
+                        .split('/')[0])
 
                 if ((imdb_id and imdb_id == str(item['id']))
                         or (tmdb_id and tmdb_id == str(item['tmdb_id']))
@@ -158,7 +166,7 @@ class Recipe(object):
             if match:
                 if self.recipe['new_library']['sort_title']['absolute']:
                     print(u"{} {} ({})".format(
-                        i+1, item['title'], item['year']))
+                        i + 1, item['title'], item['year']))
                 else:
                     print(u"{} {} ({})".format(
                         matching_total, item['title'], item['year']))
@@ -180,7 +188,7 @@ class Recipe(object):
         except:
             print(u"Unable to create the new library folder "
                   u"'{folder}'.".format(
-                      folder=self.recipe['new_library']['folder']))
+                folder=self.recipe['new_library']['folder']))
             print(u"Exiting script.")
             return 0
 
@@ -219,27 +227,27 @@ class Recipe(object):
                                 try:
                                     os.makedirs(parent_path)
                                 except OSError as e:
-                                    if e.errno == errno.EEXIST and \
-                                            os.path.isdir(parent_path):
+                                    if e.errno == errno.EEXIST \
+                                            and os.path.isdir(parent_path):
                                         pass
                                     else:
                                         raise
                             # Clean up old, empty directories
-                            if (os.path.exists(new_path) and not
-                                    os.listdir(new_path)):
+                            if os.path.exists(new_path) \
+                                    and not os.listdir(new_path):
                                 os.rmdir(new_path)
 
-                        if (dir and not os.path.exists(new_path)) or \
-                                (not dir and not os.path.isfile(new_path)):
+                        if (dir and not os.path.exists(new_path)) \
+                                or not dir and not os.path.isfile(new_path):
                             try:
                                 if os.name == 'nt':
                                     if dir:
                                         subprocess.call(['mklink', '/D',
-                                                        new_path, old_path],
+                                                         new_path, old_path],
                                                         shell=True)
                                     else:
                                         subprocess.call(['mklink', new_path,
-                                                        old_path_file],
+                                                         old_path_file],
                                                         shell=True)
                                 else:
                                     if dir:
@@ -269,8 +277,10 @@ class Recipe(object):
                             for f in library_config['folders']:
                                 if old_path.lower().startswith(f.lower()):
                                     old_path = os.path.join(f,
-                                        old_path.replace(f, '').strip(
-                                            os.sep).split(os.sep)[0])
+                                                            old_path.replace(
+                                                                f, '').strip(
+                                                                os.sep).split(
+                                                                os.sep)[0])
                                     folder_name = os.path.relpath(old_path, f)
                                     break
                             else:
@@ -284,7 +294,7 @@ class Recipe(object):
                                 try:
                                     if os.name == 'nt':
                                         subprocess.call(['mklink', '/D',
-                                                        new_path, old_path],
+                                                         new_path, old_path],
                                                         shell=True)
                                     else:
                                         os.symlink(old_path, new_path)
@@ -295,7 +305,7 @@ class Recipe(object):
                                     break
                                 except Exception as e:
                                     print(u"Symlink failed for {path}: {e}"
-                                        .format(path=new_path, e=e))
+                                          .format(path=new_path, e=e))
                             else:
                                 done = True
                                 break
@@ -347,8 +357,8 @@ class Recipe(object):
                 tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
             elif m.guid is not None and 'thetvdb://' in m.guid:
                 tvdb_id = (m.guid.split('thetvdb://')[1]
-                           .split('?')[0]
-                           .split('/')[0])
+                    .split('?')[0]
+                    .split('/')[0])
             else:
                 imdb_id = None
 
@@ -386,7 +396,7 @@ class Recipe(object):
                                         None)
                 if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
-                        new_library.key, item.ratingKey, i+1, m['title'],
+                        new_library.key, item.ratingKey, i + 1, m['title'],
                         self.library_type,
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible']
@@ -415,12 +425,12 @@ class Recipe(object):
             # Remove items from the new library which no longer qualify
             print(u"Removing symlinks for items "
                   "which no longer qualify ".format(
-                    library=self.recipe['new_library']['name']))
+                library=self.recipe['new_library']['name']))
             count = 0
             updated_paths = []
             deleted_items = []
-            max_date = add_years((self.recipe['new_library']['max_age'] or 0) \
-                                 * -1)
+            max_date = add_years(
+                (self.recipe['new_library']['max_age'] or 0) * -1)
             if self.library_type == 'movie':
                 for movie in imdb_map.values():
                     if not self.recipe['new_library']['remove_from_library']:
@@ -447,8 +457,8 @@ class Recipe(object):
                                 folder_name)
                             dir = True
 
-                        if (dir and os.path.exists(new_path)) or \
-                                (not dir and os.path.isfile(new_path)):
+                        if (dir and os.path.exists(new_path)) or (
+                                not dir and os.path.isfile(new_path)):
                             try:
                                 if os.name == 'nt':
                                     # Python 3.2+ only
@@ -466,8 +476,7 @@ class Recipe(object):
                                 updated_paths.append(new_path)
                             except Exception as e:
                                 print(u"Remove symlink failed for "
-                                      "{path}: {e}".format(path=new_path,
-                                                           e=e))
+                                      "{path}: {e}".format(path=new_path, e=e))
             else:
                 for tv_show in imdb_map.values():
                     done = False
@@ -605,8 +614,8 @@ class Recipe(object):
                 tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
             elif m.guid is not None and 'thetvdb://' in m.guid:
                 tvdb_id = (m.guid.split('thetvdb://')[1]
-                           .split('?')[0]
-                           .split('/')[0])
+                    .split('?')[0]
+                    .split('/')[0])
             else:
                 imdb_id = None
 
@@ -643,7 +652,7 @@ class Recipe(object):
                                         None)
                 if item:
                     self.plex.set_sort_title(
-                        new_library.key, item.ratingKey, i+1, m['title'],
+                        new_library.key, item.ratingKey, i + 1, m['title'],
                         self.library_type,
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible'])
@@ -691,7 +700,7 @@ class Recipe(object):
                 count=len(missing_items)))
             for idx, item in missing_items:
                 print(u"{idx}\t{release}\t{imdb_id}\t{title} ({year})".format(
-                    idx=idx+1, release=item.get('release_date', ''),
+                    idx=idx + 1, release=item.get('release_date', ''),
                     imdb_id=item['id'], title=item['title'],
                     year=item['year']))
 
@@ -757,8 +766,9 @@ class Recipe(object):
                 if self.recipe['weighted_sorting']['better_release_date']:
                     m['release_date'] = _get_non_theatrical_release(
                         details['release_dates']) or \
-                        datetime.datetime.strptime(details['release_date'],
-                                                   '%Y-%m-%d').date()
+                                        datetime.datetime.strptime(
+                                            details['release_date'],
+                                            '%Y-%m-%d').date()
                 else:
                     m['release_date'] = datetime.datetime.strptime(
                         details['release_date'], '%Y-%m-%d').date()
@@ -817,9 +827,9 @@ class Recipe(object):
         item_list.sort(key=lambda m: m['weight'], reverse=True)
 
         for i, m in enumerate(item_list):
-            if (i+1) < m['original_idx']:
+            if (i + 1) < m['original_idx']:
                 net = Colors.GREEN + u'↑'
-            elif (i+1) > m['original_idx']:
+            elif (i + 1) > m['original_idx']:
                 net = Colors.RED + u'↓'
             else:
                 net = u' '
@@ -829,7 +839,7 @@ class Recipe(object):
                 print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, "
                       "w_vote:{:0<5}; age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; "
                       "w_cmb:{:0<5}; {} {}{}"
-                      .format(net, i+1, m['original_idx'],
+                      .format(net, i + 1, m['original_idx'],
                               round(m['index_weight'], 3),
                               m.get('tmdb_vote', 0.0),
                               round(m['vote_weight'], 3), m.get('age', 0),

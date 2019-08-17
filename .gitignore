@@ -9,5 +9,6 @@ syntax: glob
 *.swp
 *__pycache__*
 .cache/
+.idea/
 config.yml
 recipes/*.yml

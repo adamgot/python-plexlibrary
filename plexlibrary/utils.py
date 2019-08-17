@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
-import yaml
-from yaml import Loader, SafeLoader
+import ruamel.yaml
 
 
 class Colors(object):
@@ -17,17 +16,14 @@ class Colors(object):
 
 class YAMLBase(object):
     def __init__(self, filename):
-        # Make sure pyyaml always returns unicode
-        def construct_yaml_str(self, node):
-            return self.construct_scalar(node)
-        Loader.add_constructor(u'tag:yaml.org,2002:str', construct_yaml_str)
-        SafeLoader.add_constructor(u'tag:yaml.org,2002:str',
-                                   construct_yaml_str)
+        self.filename = filename
 
-        with open(filename, 'r') as f:
+        yaml = ruamel.yaml.YAML()
+        yaml.preserve_quotes = True
+        with open(self.filename, 'r') as f:
             try:
-                self.data = yaml.safe_load(f)
-            except yaml.YAMLError as e:
+                self.data = yaml.load(f)
+            except ruamel.yaml.YAMLError as e:
                 raise e
 
     def __getitem__(self, k):
@@ -36,11 +32,19 @@ class YAMLBase(object):
     def __iter__(self, k):
         return self.data.itervalues()
 
+    def __setitem__(self, k, v):
+        self.data[k] = v
+
     def get(self, k, default=None):
         if k in self.data:
             return self.data[k]
         else:
             return default
+
+    def save(self):
+        yaml = ruamel.yaml.YAML()
+        with open(self.filename, 'w') as f:
+            yaml.dump(self.data, f)
 
 
 def add_years(years, from_date=None):
