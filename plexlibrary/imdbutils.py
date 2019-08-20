@@ -50,7 +50,7 @@ class IMDb(object):
                 date = datetime.datetime.strptime(tmdb_data['release_date'],
                                                   '%Y-%m-%d')
             elif imdb_years[i]:
-                date = datetime.date(int(str(imdb_years[i]).strip("()")),
+                date = datetime.datetime(int(str(imdb_years[i]).strip("()")),
                                      12, 31)
             else:
                 date = datetime.date.today()
