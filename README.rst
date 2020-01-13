@@ -158,4 +158,7 @@ Example:
 .. code-block:: shell
 
     cp /opt/appdata/python-plexlibrary/recipes/tv_amazon.yml /opt/appdata/python-plexlibrary/recipes/tv_hulu.yml
+    
+.. code-block:: shell
+
     nano /opt/appdata/python-plexlibrary/recipes/tv_hulu.yml
