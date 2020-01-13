@@ -101,15 +101,20 @@ Original functionality is based on https://gist.github.com/JonnyWong16/b1aa2c0f6
 
 Custom Python Plexlibrary Recipes
 ---------------------------------
-I have added my current recipes I have made for Custom Python Plexlibrary Recipes for some of my lists.
+I have added my current recipes I have made for Python Plexlibrary using some of Porkie16 lists.
 
 https://github.com/adamgot/python-plexlibrary
+https://github.com/porkie02/trakt
 
 These recipes will run out of the box for PTS users.
 
-Do one recipe at a time and when it pops up in plex edit the lib and remove from dashboard, disable thumbnails, disable cinema trailers and finally disable collections. When creating new libs with receipes it will trigger a scan but its quite quick and doesnt effect anything else being added with PAS.
+Do one recipe at a time and when it pops up in plex, edit the library and uncheck 'Include in dashboard', uncheck 'Enable video preview thumbnails' and finally disable collections (from the drop down). When creating new library with receipes, it will trigger a scan but its quite quick and doesn't effect anything else being added with PAS. Just as a precaution, stop all downloads until the library has finished being added.
 
 To update your custom libs weekly drop the plexlibrary.sh from the scripts folder in the repo into /opt/appdata/python-plexlibrary.
+
+.. code-block:: shell
+
+    cp /opt/appdata/python-plexlibrary/scripts/plexlibrary.sh /opt/appdata/python-plexlibrary/plexlibrary.sh
 
 .. code-block:: shell
 
@@ -121,11 +126,13 @@ Then open cron with.
 
     crontab -e
 
-Then add a cron at the bottom of the file
+Then add this line to the bottom of the file
 
 .. code-block:: shell
 
     @weekly bash /opt/appdata/python-plexlibrary/plexlibrary.sh >/dev/null 2>&1
+    
+save and exit with **ctrl+o** & **ctrl+x**
 
 If you would like to keep your series lists up to date with traktarr (you must have this set up already) then do the following:
 
@@ -135,7 +142,7 @@ Edit the series lists to your liking
 
     nano /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh
 
-Save with **ctrl+o** and then close with **ctrl+x**
+save and exit with **ctrl+o** & **ctrl+x**
 
 Open cron with
 
