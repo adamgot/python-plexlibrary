@@ -163,3 +163,5 @@ Example
 .. code-block:: shell
 
     nano /opt/appdata/python-plexlibrary/recipes/tv_hulu.yml
+
+If you have set up the cronjob above, it will automatically update any recipes found in this folder weekly.
