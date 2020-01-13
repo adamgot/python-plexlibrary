@@ -57,6 +57,10 @@ Getting started
 
 4. Copy config-template.yml to config.yml and edit it with your information.
 
+  .. code-block:: shell
+
+      cp /opt/appdata/python-plexlibrary/config-template.yml /opt/appdata/python-plexlibrary/config.yml
+
   * Here's a guide if you're unfamiliar with YAML syntax. **Most notably you need to use spaces instead of tabs!** http://docs.ansible.com/ansible/latest/YAMLSyntax.html
 
 5. Check out the recipe examples under recipes/examples. Copy an example to recipes/ and edit it with the appropriate information.
