@@ -83,7 +83,7 @@ To run a recipe named "movies_trending", run:
 
     python plexlibrary movies_trending
     
-Hawkinzzz Custom Python Plexlibrary Recipes
+Custom Python Plexlibrary Recipes
 ---------------------------------
 I have added my current recipes I have made for Python Plexlibrary using some of Porkie16 lists.
 
