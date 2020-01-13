@@ -114,13 +114,9 @@ These recipes will run out of the box for PTS users.
 
 Do one recipe at a time and when it pops up in plex, edit the library and uncheck 'Include in dashboard', uncheck 'Enable video preview thumbnails' and finally disable collections (from the drop down). When creating new library with receipes, it will trigger a scan but its quite quick and doesn't effect anything else being added with PAS. Just as a precaution, stop all downloads until the library has finished being added.
 
-To update your custom libraries weekly drop the plexlibrary.sh from the scripts folder in the repo into /opt/appdata/python-plexlibrary.
+To update your custom libraries weekly perform the following.
 
-.. code-block:: shell
-
-    cp /opt/appdata/python-plexlibrary/scripts/plexlibrary.sh /opt/appdata/python-plexlibrary/plexlibrary.sh
-
-and make it executable with the following.
+make it executable with the following.
 
 .. code-block:: shell
 
@@ -149,6 +145,12 @@ Edit the series lists to your liking
     nano /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh
 
 save and exit with **ctrl+o** & **ctrl+x**.
+
+make it executable with the following.
+
+.. code-block:: shell
+
+    chmod +x /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh
 
 Open cron with
 
