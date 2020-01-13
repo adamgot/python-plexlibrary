@@ -114,7 +114,8 @@ These recipes will run out of the box for PTS users.
 
 Do one recipe at a time and when it pops up in plex, edit the library and uncheck 'Include in dashboard', uncheck 'Enable video preview thumbnails' and finally disable collections (from the drop down). When creating new library with receipes, it will trigger a scan but its quite quick and doesn't effect anything else being added with PAS. Just as a precaution, stop all downloads until the library has finished being added.
 
-To update your custom libraries weekly perform the following.
+Update your custom libraries weekly
+-----------------------------------
 
 make it executable with the following.
 
