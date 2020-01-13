@@ -154,7 +154,8 @@ Creating your own recipe
 
 If you would like to create your own recipe then just copy the recipe and adjust the details to suit.
 
-Example:
+Example
+
 .. code-block:: shell
 
     cp /opt/appdata/python-plexlibrary/recipes/tv_amazon.yml /opt/appdata/python-plexlibrary/recipes/tv_hulu.yml
