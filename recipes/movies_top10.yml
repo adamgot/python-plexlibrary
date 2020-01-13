@@ -24,9 +24,9 @@ new_library:
     absolute: false  # Skips numbers for missing items
   # Limit the age (in years) of items to be considered
   # * 0 for no limit
-  max_age: 3
+  max_age: 0
   # Maximum number of items to keep in the library
-  max_count: 250
+  max_count: 0
   # Remove items that no longer exist in the source lists
   remove_from_library: true
 
