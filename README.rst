@@ -114,8 +114,8 @@ These recipes will run out of the box for PTS users.
 
 Do one recipe at a time and when it pops up in plex, edit the library and uncheck 'Include in dashboard', uncheck 'Enable video preview thumbnails' and finally disable collections (from the drop down). When creating new library with receipes, it will trigger a scan but its quite quick and doesn't effect anything else being added with PAS. Just as a precaution, stop all downloads until the library has finished being added.
 
-Update your custom libraries weekly
------------------------------------
+Update your custom plex libraries weekly
+----------------------------------------
 
 make it executable with the following.
 
@@ -137,9 +137,12 @@ Then add this line to the bottom of the file.
     
 save and exit with **ctrl+o** & **ctrl+x**.
 
-If you would like to keep your series lists up to date with traktarr (you must have this set up already) then do the following.
+Keep your series lists up to date with traktarr
+-----------------------------------------------
 
-Edit the series lists to your liking
+First of all, make sure you have this set up correctly https://github.com/PTS-Team/PTS-Team/wiki/Traktarr
+
+Then, edit the series lists to your liking. I have provided some of my favourite ones for you.
 
 .. code-block:: shell
 
