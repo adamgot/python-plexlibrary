@@ -26,7 +26,7 @@ new_library:
   # * 0 for no limit
   max_age: 0
   # Maximum number of items to keep in the library
-  max_count: 0
+  max_count: 250
   # Remove items that no longer exist in the source lists
   remove_from_library: true
 
