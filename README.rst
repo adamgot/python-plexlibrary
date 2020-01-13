@@ -112,33 +112,33 @@ Do one recipe at a time and when it pops up in plex edit the lib and remove from
 To update your custom libs weekly drop the plexlibrary.sh from the scripts folder in the repo into /opt/appdata/python-plexlibrary.
 
 .. code-block:: shell
-chmod +x /opt/appdata/python-plexlibrary/plexlibrary.sh
+    chmod +x /opt/appdata/python-plexlibrary/plexlibrary.sh
 
 Then open cron with.
 
 .. code-block:: shell
-crontab -e
+    crontab -e
 
 Then add a cron at the bottom of the file
 
 .. code-block:: shell
-@weekly bash /opt/appdata/python-plexlibrary/plexlibrary.sh >/dev/null 2>&1
+    @weekly bash /opt/appdata/python-plexlibrary/plexlibrary.sh >/dev/null 2>&1
 
 If you would like to keep your series lists up to date with traktarr (you must have this set up already) then do the following:
 
 Edit the series lists to your liking
 
 .. code-block:: shell
-nano /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh
+    nano /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh
 
 Save with **ctrl+o** and then close with **ctrl+x**
 
 Open cron with
 
 .. code-block:: shell
-crontab -e
+    crontab -e
 
 Then add a cron at the bottom of the file
 
 .. code-block:: shell
-@weekly bash /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh >/dev/null 2>&1
+    @weekly bash /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh >/dev/null 2>&1
