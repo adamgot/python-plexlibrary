@@ -148,3 +148,14 @@ Then add a cron at the bottom of the file
 .. code-block:: shell
 
     @weekly bash /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh >/dev/null 2>&1
+
+Creating your own recipe
+------------------------
+
+If you would like to create your own recipe then just copy the recipe and adjust the details to suit.
+
+Example:
+.. code-block:: shell
+
+    cp /opt/appdata/python-plexlibrary/recipes/tv_amazon.yml /opt/appdata/python-plexlibrary/recipes/tv_hulu.yml
+    nano /opt/appdata/python-plexlibrary/recipes/tv_hulu.yml
