@@ -11,10 +11,6 @@ accordingly.
 .. _Trakt: https://trakt.tv/
 .. _IMDb: https://imdb.com/
 
-Disclaimer
-----------
-This is still a work in progress, so major changes may occur in new versions.
-
 Requirements
 ------------
 
@@ -87,27 +83,12 @@ To run a recipe named "movies_trending", run:
 
     python plexlibrary movies_trending
     
-**(If you're on Windows, you might have to run as admin)**
-
-When you're happy with the results, automate the recipe in cron_ or equivalent (automated tasks in Windows https://technet.microsoft.com/en-us/library/cc748993(v=ws.11).aspx).
-
-.. _cron: https://code.tutsplus.com/tutorials/scheduling-tasks-with-cron-jobs--net-8800
-
-**Pro tip!** Edit the new library and uncheck *"Include in dashboard"*. Othewise if you start watching something that exists in multiple libraries, all items will show up on the On Deck. This makes it so that only the item in your main library shows up.
-
-Planned features
-----------------
-See issues.
-
-Credit
-------
-Original functionality is based on https://gist.github.com/JonnyWong16/b1aa2c0f604ed92b9b3afaa6db18e5fd
-
-Custom Python Plexlibrary Recipes
+Hawkinzzz Custom Python Plexlibrary Recipes
 ---------------------------------
 I have added my current recipes I have made for Python Plexlibrary using some of Porkie16 lists.
 
 https://github.com/adamgot/python-plexlibrary
+
 https://github.com/porkie02/trakt
 
 These recipes will run out of the box for PTS users.
