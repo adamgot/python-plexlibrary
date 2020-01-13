@@ -8,7 +8,8 @@ E.g. Create a library consisting of all movies or tv shows in a Trakt_ list or
 on an IMDb_ chart that exist in your main library, and set the sort titles
 accordingly.
 
-Make sure to clone this repo to **/opt/appdata/**
+**IMPOTANT!**
+Make sure to clone this repo to **/opt/appdata/** or else the scripts will not work.
 
 .. _Trakt: https://trakt.tv/
 .. _IMDb: https://imdb.com/
