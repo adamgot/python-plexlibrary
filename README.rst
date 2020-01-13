@@ -99,3 +99,46 @@ Credit
 ------
 Original functionality is based on https://gist.github.com/JonnyWong16/b1aa2c0f604ed92b9b3afaa6db18e5fd
 
+Custom Python Plexlibrary Recipes
+---------------------------------
+I have added my current recipes I have made for Custom Python Plexlibrary Recipes for some of my lists.
+
+https://github.com/adamgot/python-plexlibrary
+
+These recipes will run out of the box for PTS users.
+
+Do one recipe at a time and when it pops up in plex edit the lib and remove from dashboard, disable thumbnails, disable cinema trailers and finally disable collections. When creating new libs with receipes it will trigger a scan but its quite quick and doesnt effect anything else being added with PAS.
+
+To update your custom libs weekly drop the plexlibrary.sh from the scripts folder in the repo into /opt/appdata/python-plexlibrary.
+
+.. code-block:: shell
+chmod +x /opt/appdata/python-plexlibrary/plexlibrary.sh
+
+Then open cron with.
+
+.. code-block:: shell
+crontab -e
+
+Then add a cron at the bottom of the file
+
+.. code-block:: shell
+@weekly bash /opt/appdata/python-plexlibrary/plexlibrary.sh >/dev/null 2>&1
+
+If you would like to keep your series lists up to date with traktarr (you must have this set up already) then do the following:
+
+Edit the series lists to your liking
+
+.. code-block:: shell
+nano /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh
+
+Save with **ctrl+o** and then close with **ctrl+x**
+
+Open cron with
+
+.. code-block:: shell
+crontab -e
+
+Then add a cron at the bottom of the file
+
+.. code-block:: shell
+@weekly bash /opt/appdata/python-plexlibrary/scripts/seriesupdate.sh >/dev/null 2>&1
