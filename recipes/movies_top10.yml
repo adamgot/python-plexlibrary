@@ -1,0 +1,51 @@
+# Supported types: movie, tv
+library_type: 'movie'
+
+# Source list(s)
+# * Experiment with the limits and order of the URLs below
+#   to get a different balance.
+source_list_urls:
+  - 'https://api.trakt.tv/users/giladg/lists/top-10-movies-of-the-week/items/movies'
+
+# Source library details
+source_libraries:
+  - name: 'Movies'
+    folders:
+      - '/mnt/unionfs/movies'
+
+# New library details
+new_library:
+  name: 'Weekly Top 10 Movies'
+  folder: '/mnt/plexlib/movies/weeklytop10/'
+  sort: true
+  sort_title:
+    format: '{number}. {title}'
+    visible: false
+    absolute: false  # Skips numbers for missing items
+  # Limit the age (in years) of items to be considered
+  # * 0 for no limit
+  max_age: 3
+  # Maximum number of items to keep in the library
+  max_count: 250
+  # Remove items that no longer exist in the source lists
+  remove_from_library: true
+
+# Weighted sorting (requires TMDb API)
+weighted_sorting:
+  enabled: true
+  better_release_date: false
+  weights:
+    # Think of these as percentages,
+    # but they don't have to add up to 1.0
+    # * Additive
+    # * Higher value -> more important
+    index: 0.70
+    vote: 0.10
+    age: 0.15
+    random: 0.05
+    # Penalize (<0) or reward (>0) certain (TMDb) genres
+    # * Final weight is multipled by these values
+    genre_bias:
+      'TV Movie': 0.7
+      'Animation': 0.95
+
