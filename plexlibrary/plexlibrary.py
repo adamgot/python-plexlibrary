@@ -17,7 +17,8 @@ Credit:
 
 import argparse
 import sys
-
+reload(sys)
+sys.setdefaultencoding('utf8')
 import recipes
 from recipe import Recipe
 
