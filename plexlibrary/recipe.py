@@ -437,6 +437,7 @@ class Recipe(object):
                         # Only remove older than max_age
                         if not self.recipe['new_library']['max_age'] \
                                 or (max_date < movie.originallyAvailableAt):
+                            imdb_map.pop(m['id'], None)
                             continue
 
                     for part in movie.iterParts():
@@ -545,10 +546,13 @@ class Recipe(object):
                     self.recipe['new_library']['name'])
             new_library.emptyTrash()
             all_new_items = new_library.all()
-        else:
+
+        if not self.recipe['new_library']['remove_from_library'] \
+                or self.recipe['new_library'].get('remove_old', False):
             while imdb_map:
                 imdb_id, item = imdb_map.popitem()
                 i += 1
+                print(u"{} {} ({})".format(i, item.title, item.year))
                 self.plex.set_sort_title(
                     new_library.key, item.ratingKey, i, item.title,
                     self.library_type,
