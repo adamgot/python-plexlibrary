@@ -82,6 +82,11 @@ class TMDb(object):
                 # Cache file error, clear
                 cache.close()
                 cache = shelve.open(self.cache_file, 'n')
+            except:
+                # Unknown cache file error, clear
+                print(u"Error in loading cache: {}".format(e))
+                cache.close()
+                cache = shelve.open(self.cache_file, 'n')
             else:
                 if (cache_item['cached'] + 3600 * 24) > int(time.time()):
                     cache.close()
