@@ -73,13 +73,13 @@ In the base directory, run:
 
 .. code-block:: shell
 
-    python plexlibrary -h
+    python3 plexlibrary -h
 
 for details on how to use the utility.
 
 .. code-block:: shell
 
-    python plexlibrary -l
+    python3 plexlibrary -l
 
 lists available recipes.
 
@@ -87,7 +87,7 @@ To run a recipe named "movies_trending", run:
 
 .. code-block:: shell
 
-    python plexlibrary movies_trending
+    python3 plexlibrary movies_trending
     
 Custom Python Plexlibrary Recipes
 ---------------------------------
