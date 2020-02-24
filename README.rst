@@ -18,6 +18,8 @@ This is still a work in progress, so major changes may occur in new versions.
 Requirements
 ------------
 
+* Python 3
+
 * You need a trakt.tv account and an API app: https://trakt.tv/oauth/applications/new
 
 * (optional) The Movie Database API
@@ -67,13 +69,13 @@ In the base directory, run:
 
 .. code-block:: shell
 
-    python plexlibrary -h
+    python3 plexlibrary -h
 
 for details on how to use the utility.
 
 .. code-block:: shell
 
-    python plexlibrary -l
+    python3 plexlibrary -l
 
 lists available recipes.
 
@@ -81,7 +83,7 @@ To run a recipe named "movies_trending", run:
 
 .. code-block:: shell
 
-    python plexlibrary movies_trending
+    python3 plexlibrary movies_trending
     
 **(If you're on Windows, you might have to run as admin)**
 
