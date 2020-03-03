@@ -55,7 +55,7 @@ Getting started
 
    .. code-block:: shell
 
-       pip install -r requirements.txt
+       pip3 install -r requirements.txt
 
 4. Copy config-template.yml to config.yml and edit it with your information.
 
