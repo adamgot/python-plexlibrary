@@ -454,7 +454,6 @@ class Recipe(object):
                         if not self.recipe['new_library']['max_age'] \
                                 or (movie.originallyAvailableAt and
                                     max_date < movie.originallyAvailableAt):
-                            imdb_map.pop(m['id'], None)
                             continue
 
                     for part in movie.iterParts():
