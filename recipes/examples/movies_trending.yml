@@ -14,12 +14,12 @@ source_list_urls:
 # Source library details
 source_libraries:
   - name: 'Movies'
-    folders:
-      - '/path/to/Movies'
-      - '/path/to/More Movies'
-  - name: 'Different Movies'
-    folders:
-      - '/path/to/Different Movies'
+  - name: 'Movies (4K)'
+
+# New playlist details
+new_playlist:
+  name: 'Trending Movies'
+  remove_from_playlist: true
 
 # New library details
 new_library:
