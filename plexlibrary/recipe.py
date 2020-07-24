@@ -432,11 +432,13 @@ class Recipe(object):
             max_date = add_years(
                 (self.recipe['new_library']['max_age'] or 0) * -1)
             if self.library_type == 'movie':
-                for movie in imdb_map.values():
+                exclude = []
+                for mid, movie in imdb_map.items():
                     if not self.recipe['new_library']['remove_from_library']:
                         # Only remove older than max_age
                         if not self.recipe['new_library']['max_age'] \
-                                or (max_date < movie.originallyAvailableAt):
+                                or (movie.originallyAvailableAt and
+                                    max_date < movie.originallyAvailableAt):
                             imdb_map.pop(m['id'], None)
                             continue
 
@@ -478,6 +480,8 @@ class Recipe(object):
                             except Exception as e:
                                 print(u"Remove symlink failed for "
                                       "{path}: {e}".format(path=new_path, e=e))
+                for mid in exclude:
+                    imdb_map.pop(mid, None)
             else:
                 for tv_show in imdb_map.values():
                     done = False
@@ -778,8 +782,11 @@ class Recipe(object):
                         details['release_date'], '%Y-%m-%d').date()
                 item_age_td = today - m['release_date']
             elif self.library_type == 'tv':
-                m['last_air_date'] = datetime.datetime.strptime(
-                    details['last_air_date'], '%Y-%m-%d').date()
+                try:
+                    m['last_air_date'] = datetime.datetime.strptime(
+                        details['last_air_date'], '%Y-%m-%d').date()
+                except TypeError:
+                    m['last_air_date'] = today
                 item_age_td = today - m['last_air_date']
             m['genres'] = [g['name'].lower() for g in details['genres']]
             m['age'] = item_age_td.days
