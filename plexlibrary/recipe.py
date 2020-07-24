@@ -28,8 +28,9 @@ class Recipe(object):
     tmdb = None
     tvdb = None
 
-    def __init__(self, recipe_name, sort_only=False, config_file=None):
+    def __init__(self, recipe_name, sort_only=False, config_file=None, use_playlists=False):
         self.recipe_name = recipe_name
+        self.use_playlists = use_playlists
 
         self.config = ConfigParser(config_file)
         self.recipe = RecipeParser(recipe_name)
@@ -69,12 +70,10 @@ class Recipe(object):
 
         self.imdb = imdbutils.IMDb(self.tmdb, self.tvdb)
 
-    def _run(self):
+    def _get_trakt_lists(self):
         item_list = []  # TODO Replace with dict, scrap item_ids?
         item_ids = []
-        force_imdb_id_match = False
 
-        # Get the trakt lists
         for url in self.recipe['source_list_urls']:
             if 'api.trakt.tv' in url:
                 (item_list, item_ids) = self.trakt.add_items(
@@ -95,8 +94,9 @@ class Recipe(object):
             else:
                 print(u"Warning: TMDd API key is required "
                       u"for weighted sorting")
+        return item_list, item_ids
 
-        # Get list of items from the Plex server
+    def _get_plex_libraries(self):
         source_libraries = []
         for library_config in self.source_library_config:
             print(u"Trying to match with items from the '{}' library ".format(
@@ -113,8 +113,9 @@ class Recipe(object):
                 source_library.ALLOWED_FILTERS += ('guid',)
 
             source_libraries.append(source_library)
+        return source_libraries
 
-        # Create a list of matching items
+    def _get_matching_items(self, source_libraries, item_list):
         matching_items = []
         missing_items = []
         matching_total = 0
@@ -123,7 +124,7 @@ class Recipe(object):
 
         for i, item in enumerate(item_list):
             match = False
-            if max_count > 0 and matching_total >= max_count:
+            if 0 < max_count <= matching_total:
                 nonmatching_idx.append(i)
                 continue
             res = []
@@ -178,7 +179,9 @@ class Recipe(object):
             for i in reversed(nonmatching_idx):
                 del item_list[i]
 
-        # Create symlinks for all items in your library on the trakt watched
+        return matching_items, missing_items, matching_total, nonmatching_idx, max_count
+
+    def _create_symbolic_links(self, matching_items, matching_total):
         print(u"Creating symlinks for {count} matching items in the "
               u"library...".format(count=matching_total))
 
@@ -203,7 +206,7 @@ class Recipe(object):
 
                     folder_name = ''
                     for library_config in self.source_library_config:
-                        for f in library_config['folders']:
+                        for f in self.plex.get_library_paths(library_name=library_config['name']):
                             f = os.path.abspath(f)
                             if old_path.lower().startswith(f.lower()):
                                 folder_name = os.path.relpath(old_path, f)
@@ -274,7 +277,7 @@ class Recipe(object):
 
                         folder_name = ''
                         for library_config in self.source_library_config:
-                            for f in library_config['folders']:
+                            for f in self.plex.get_library_paths(library_name=library_config['name']):
                                 if old_path.lower().startswith(f.lower()):
                                     old_path = os.path.join(f,
                                                             old_path.replace(
@@ -314,9 +317,8 @@ class Recipe(object):
         for item in new_items:
             print(u"{title} ({year})".format(title=item.title, year=item.year))
 
+    def _verify_new_library_and_get_items(self, create_if_not_found=False):
         # Check if the new library exists in Plex
-        print(u"Creating the '{}' library in Plex...".format(
-            self.recipe['new_library']['name']))
         try:
             new_library = self.plex.server.library.section(
                 self.recipe['new_library']['name'])
@@ -324,12 +326,17 @@ class Recipe(object):
 
             new_library.update()
         except plexapi.exceptions.NotFound:
-            self.plex.create_new_library(
-                self.recipe['new_library']['name'],
-                self.recipe['new_library']['folder'],
-                self.library_type)
-            new_library = self.plex.server.library.section(
-                self.recipe['new_library']['name'])
+            if create_if_not_found:
+                self.plex.create_new_library(
+                    self.recipe['new_library']['name'],
+                    self.recipe['new_library']['folder'],
+                    self.library_type)
+                new_library = self.plex.server.library.section(
+                    self.recipe['new_library']['name'])
+            else:
+                raise Exception("Library '{library}' does not exist".format(
+                    library=self.recipe['new_library']['name']))
+
 
         # Wait for metadata to finish downloading before continuing
         print(u"Waiting for metadata to finish downloading...")
@@ -343,11 +350,11 @@ class Recipe(object):
         # Retrieve a list of items from the new library
         print(u"Retrieving a list of items from the '{library}' library in "
               u"Plex...".format(library=self.recipe['new_library']['name']))
-        all_new_items = new_library.all()
+        return new_library, new_library.all()
 
-        # Create a dictionary of {imdb_id: item}
+    def _get_imdb_dict(self, media_items, item_ids, force_match=False):
         imdb_map = {}
-        for m in all_new_items:
+        for m in media_items:
             imdb_id = None
             tmdb_id = None
             tvdb_id = None
@@ -368,7 +375,7 @@ class Recipe(object):
                 imdb_map['tmdb' + str(tmdb_id)] = m
             elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
                 imdb_map['tvdb' + str(tvdb_id)] = m
-            elif force_imdb_id_match:
+            elif force_match:
                 # Only IMDB ID found for some items
                 if tmdb_id:
                     imdb_id = self.tmdb.get_imdb_id(tmdb_id)
@@ -380,8 +387,9 @@ class Recipe(object):
                     imdb_map[m.ratingKey] = m
             else:
                 imdb_map[m.ratingKey] = m
+        return imdb_map
 
-        # Modify the sort titles
+    def _modify_sort_titles_and_cleanup(self, item_list, imdb_map, new_library, sort_only=False):
         if self.recipe['new_library']['sort']:
             print(u"Setting the sort titles for the '{}' library...".format(
                 self.recipe['new_library']['name']))
@@ -419,10 +427,17 @@ class Recipe(object):
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible']
                     )
+                    if sort_only:
+                        self._pop_imdb_map(imdb_map=imdb_map, new_library=new_library)
+                        return True
+        if self.recipe['new_library']['remove_from_library'] or self.recipe['new_library'].get('remove_old', False):
+            # Remove old items that no longer qualify
+            self._remove_old_items_from_library(imdb_map=imdb_map)
+            all_new_items = self._cleanup_new_library(new_library=new_library)
+            self._pop_imdb_map(imdb_map=imdb_map, new_library=new_library)
+        return all_new_items
 
-        if self.recipe['new_library']['remove_from_library'] \
-                or self.recipe['new_library'].get('remove_old', False):
-            # Remove items from the new library which no longer qualify
+    def _remove_old_items_from_library(self, imdb_map):
             print(u"Removing symlinks for items "
                   "which no longer qualify ".format(
                 library=self.recipe['new_library']['name']))
@@ -537,159 +552,78 @@ class Recipe(object):
                 print(u"{title} ({year})".format(title=item.title,
                                                  year=item.year))
 
-            # Scan the library to clean up the deleted items
-            print(u"Scanning the '{library}' library...".format(
-                library=self.recipe['new_library']['name']))
-            new_library.update()
-            time.sleep(10)
-            new_library = self.plex.server.library.section(
-                self.recipe['new_library']['name'])
-            while new_library.refreshing:
-                time.sleep(5)
-                new_library = self.plex.server.library.section(
-                    self.recipe['new_library']['name'])
-            new_library.emptyTrash()
-            all_new_items = new_library.all()
-
-        if not self.recipe['new_library']['remove_from_library'] \
-                or self.recipe['new_library'].get('remove_old', False):
-            while imdb_map:
-                imdb_id, item = imdb_map.popitem()
-                i += 1
-                print(u"{} {} ({})".format(i, item.title, item.year))
-                self.plex.set_sort_title(
-                    new_library.key, item.ratingKey, i, item.title,
-                    self.library_type,
-                    self.recipe['new_library']['sort_title']['format'],
-                    self.recipe['new_library']['sort_title']['visible'])
-
-        return missing_items, len(all_new_items)
-
-    def _run_sort_only(self):
-        item_list = []
-        item_ids = []
-        force_imdb_id_match = False
-
-        # Get the trakt lists
-        for url in self.recipe['source_list_urls']:
-            if 'api.trakt.tv' in url:
-                (item_list, item_ids) = self.trakt.add_items(
-                    self.library_type, url, item_list, item_ids,
-                    self.recipe['new_library']['max_age'] or 0)
-            else:
-                raise Exception("Unsupported source list: {url}".format(
-                    url=url))
-
-        if self.recipe['weighted_sorting']['enabled']:
-            if self.config['tmdb']['api_key']:
-                print(u"Getting data from TMDb to add weighted sorting...")
-                item_list = self.weighted_sorting(item_list)
-            else:
-                print(u"Warning: TMDd API key is required "
-                      "for weighted sorting")
-
-        try:
-            new_library = self.plex.server.library.section(
-                self.recipe['new_library']['name'])
-        except:
-            raise Exception("Library '{library}' does not exist".format(
-                library=self.recipe['new_library']['name']))
-
+    def _cleanup_new_library(self, new_library):
+        # Scan the library to clean up the deleted items
+        print(u"Scanning the '{library}' library...".format(
+            library=self.recipe['new_library']['name']))
         new_library.update()
-        # Wait for metadata to finish downloading before continuing
-        print(u"Waiting for metadata to finish downloading...")
+        time.sleep(10)
         new_library = self.plex.server.library.section(
             self.recipe['new_library']['name'])
         while new_library.refreshing:
             time.sleep(5)
             new_library = self.plex.server.library.section(
                 self.recipe['new_library']['name'])
+        new_library.emptyTrash()
+        return new_library.all()
 
-        # Retrieve a list of items from the new library
-        print(u"Retrieving a list of items from the '{library}' library in "
-              u"Plex...".format(library=self.recipe['new_library']['name']))
-        all_new_items = new_library.all()
+    def _pop_imdb_map(self, imdb_map, new_library, i=0):
+        while imdb_map:
+            imdb_id, item = imdb_map.popitem()
+            i += 1
+            print(u"{} {} ({})".format(i, item.title, item.year))
+            self.plex.set_sort_title(
+                new_library.key, item.ratingKey, i, item.title,
+                self.library_type,
+                self.recipe['new_library']['sort_title']['format'],
+                self.recipe['new_library']['sort_title']['visible'])
 
-        # Create a dictionary of {imdb_id: item}
-        imdb_map = {}
-        for m in all_new_items:
-            imdb_id = None
-            tmdb_id = None
-            tvdb_id = None
-            if m.guid is not None and 'imdb://' in m.guid:
-                imdb_id = m.guid.split('imdb://')[1].split('?')[0]
-            elif m.guid is not None and 'themoviedb://' in m.guid:
-                tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
-            elif m.guid is not None and 'thetvdb://' in m.guid:
-                tvdb_id = (m.guid.split('thetvdb://')[1]
-                    .split('?')[0]
-                    .split('/')[0])
+    def _run(self):
+        # Get the trakt lists
+        item_list, item_ids = self._get_trakt_lists()
+        force_imdb_id_match = False
+
+        # Get list of items from the Plex server
+        source_libraries = self._get_plex_libraries()
+
+        # Create a list of matching items
+        matching_items, missing_items, matching_total, nonmatching_idx, max_count = self._get_matching_items(
+            source_libraries=source_libraries, item_list=item_list)
+
+        if self.use_playlists:
+            # Start playlist process
+            if self.recipe['new_library']['remove_from_library'] or self.recipe['new_library'].get('remove_old', False):
+                # Start playlist over again
+                self.plex.reset_playlist(playlist_name=self.recipe['new_playlist']['name'], new_items=matching_items)
             else:
-                imdb_id = None
-
-            if imdb_id and str(imdb_id) in item_ids:
-                imdb_map[imdb_id] = m
-            elif tmdb_id and ('tmdb' + str(tmdb_id)) in item_ids:
-                imdb_map['tmdb' + str(tmdb_id)] = m
-            elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
-                imdb_map['tvdb' + str(tvdb_id)] = m
-            elif force_imdb_id_match:
-                # Only IMDB ID found for some items
-                if tmdb_id:
-                    imdb_id = self.tmdb.get_imdb_id(tmdb_id)
-                elif tvdb_id:
-                    imdb_id = self.tvdb.get_imdb_id(tvdb_id)
-                if imdb_id and str(imdb_id) in item_ids:
-                    imdb_map[imdb_id] = m
-                else:
-                    imdb_map[m.ratingKey] = m
-            else:
-                imdb_map[m.ratingKey] = m
-
-        # Modify the sort titles
-        print(u"Setting the sort titles for the '{}' library...".format(
-            self.recipe['new_library']['name']))
-        if self.recipe['new_library']['sort_title']['absolute']:
-            for i, m in enumerate(item_list):
-                item = imdb_map.pop(m['id'], None)
-                if not item:
-                    item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')),
-                                        None)
-                if not item:
-                    item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
-                                        None)
-                if item:
-                    self.plex.set_sort_title(
-                        new_library.key, item.ratingKey, i + 1, m['title'],
-                        self.library_type,
-                        self.recipe['new_library']['sort_title']['format'],
-                        self.recipe['new_library']['sort_title']['visible'])
+                # Keep existing items
+                self.plex.add_to_playlist(playlist_name=self.recipe['new_playlist']['name'], items=matching_items)
+            playlist_items = self.plex.get_playlist_items(playlist_name=self.recipe['new_playlist']['name'])
+            return missing_items, (len(playlist_items) if playlist_items else 0)
         else:
-            i = 0
-            for m in item_list:
-                item = imdb_map.pop(m['id'], None)
-                if not item:
-                    item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')),
-                                        None)
-                if not item:
-                    item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
-                                        None)
-                if item:
-                    i += 1
-                    self.plex.set_sort_title(
-                        new_library.key, item.ratingKey, i, m['title'],
-                        self.library_type,
-                        self.recipe['new_library']['sort_title']['format'],
-                        self.recipe['new_library']['sort_title']['visible'])
-            while imdb_map:
-                imdb_id, item = imdb_map.popitem()
-                i += 1
-                self.plex.set_sort_title(
-                    new_library.key, item.ratingKey, i, item.title,
-                    self.library_type,
-                    self.recipe['new_library']['sort_title']['format'],
-                    self.recipe['new_library']['sort_title']['visible'])
+            # Start library process
+            # Create symlinks for all items in your library on the trakt watched
+            self._create_symbolic_links(matching_items=matching_items, matching_total=matching_total)
+            # Post-process new library
+            print(u"Creating the '{}' library in Plex...".format(
+                self.recipe['new_library']['name']))
+            new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=True)
+            # Create a dictionary of {imdb_id: item}
+            imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids, force_match=force_imdb_id_match)
+            # Modify the sort titles
+            all_new_items = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library, sort_only=False)
+            return missing_items, len(all_new_items)
 
+    def _run_sort_only(self):
+        item_list, item_ids = self._get_trakt_lists()
+        force_imdb_id_match = False
+
+        # Get existing library and its items
+        new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=False)
+        # Create a dictionary of {imdb_id: item}
+        imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids, force_match=force_imdb_id_match)
+        # Modify the sort titles
+        _ = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library, sort_only=True)
         return len(all_new_items)
 
     def run(self, sort_only=False):

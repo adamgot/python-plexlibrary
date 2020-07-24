@@ -42,6 +42,9 @@ def main():
         help='list available recipes')
     parser.add_argument(
         '-s', '--sort-only', action='store_true', help='only sort the library')
+    parser.add_argument(
+        '-p', '--playlists', action='store_true', help='make playlists rather than libraries'
+    )
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -57,7 +60,7 @@ def main():
         list_recipes()
         sys.exit(1)
 
-    r = Recipe(args.recipe)
+    r = Recipe(recipe_name=args.recipe, use_playlists=args.playlists)
     r.run(args.sort_only)
 
     print("Done!")
