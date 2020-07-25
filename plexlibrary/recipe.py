@@ -452,12 +452,13 @@ class Recipe(object):
         max_date = add_years(
             (self.recipe['new_library']['max_age'] or 0) * -1)
         if self.library_type == 'movie':
-            for movie in imdb_map.values():
+            exclude = []
+            for mid, movie in imdb_map.items():
                 if not self.recipe['new_library']['remove_from_library']:
                     # Only remove older than max_age
                     if not self.recipe['new_library']['max_age'] \
-                            or (max_date < movie.originallyAvailableAt):
-                        imdb_map.pop(m['id'], None)
+                            or (movie.originallyAvailableAt and 
+                                max_date < movie.originallyAvailableAt):
                         continue
 
                 for part in movie.iterParts():
@@ -498,6 +499,8 @@ class Recipe(object):
                         except Exception as e:
                             logs.error(u"Remove symlink failed for "
                                        "{path}: {e}".format(path=new_path, e=e))
+            for mid in exclude:
+                imdb_map.pop(mid, None)
         else:
             for tv_show in imdb_map.values():
                 done = False
