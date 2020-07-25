@@ -580,7 +580,7 @@ class Recipe(object):
                 self.recipe['new_library']['sort_title']['format'],
                 self.recipe['new_library']['sort_title']['visible'])
 
-    def _run(self):
+    def _run(self, share_playlist_to_all=False):
         # Get the trakt lists
         item_list, item_ids = self._get_trakt_lists()
         force_imdb_id_match = False
@@ -599,12 +599,14 @@ class Recipe(object):
                 # Start playlist over again
                 self.plex.reset_playlist(playlist_name=self.recipe['new_playlist']['name'], new_items=matching_items,
                                          user_names=self.recipe['new_playlist']['share_to_users'],
-                                         all_users=self.recipe['new_playlist']['share_to_all'])
+                                         all_users=(share_playlist_to_all if share_playlist_to_all else
+                                                    self.recipe['new_playlist']['share_to_all']))
             else:
                 # Keep existing items
                 self.plex.add_to_playlist(playlist_name=self.recipe['new_playlist']['name'], items=matching_items,
                                           user_names=self.recipe['new_playlist']['share_to_users'],
-                                          all_users=self.recipe['new_playlist']['share_to_all'])
+                                          all_users=(share_playlist_to_all if share_playlist_to_all else
+                                                    self.recipe['new_playlist']['share_to_all']))
             playlist_items = self.plex.get_playlist_items(playlist_name=self.recipe['new_playlist']['name'])
             return missing_items, (len(playlist_items) if playlist_items else 0)
         else:
@@ -636,7 +638,7 @@ class Recipe(object):
                                                  sort_only=True)
         return len(all_new_items)
 
-    def run(self, sort_only=False):
+    def run(self, sort_only=False, share_playlist_to_all=False):
         if sort_only:
             logs.info(u"Running the recipe '{}', sorting only".format(
                 self.recipe_name))
@@ -645,7 +647,7 @@ class Recipe(object):
                 count=list_count, library_or_playlist=('playlist' if self.use_playlists else 'library')))
         else:
             logs.info(u"Running the recipe '{}'".format(self.recipe_name))
-            missing_items, list_count = self._run()
+            missing_items, list_count = self._run(share_playlist_to_all=share_playlist_to_all)
             logs.info(u"Number of items in the new {library_or_playlist}: {count}".format(
                 count=list_count, library_or_playlist=('playlist' if self.use_playlists else 'library')))
             logs.info(u"Number of missing items: {count}".format(

@@ -3,6 +3,7 @@ import plexapi.server
 import plexapi.media
 import requests
 import logs
+import time
 from typing import List
 
 
@@ -87,6 +88,7 @@ class Plex(object):
                                                                                       list_name=playlist_name))
                 user_server = self._get_plex_instance_for_user(user=user)
                 user_server.add_to_playlist(playlist_name=playlist_name, items=items)
+                time.sleep(2)  # don't DDOS your own server
         else:
             playlist = self._get_existing_playlist(playlist_name=playlist_name)
             if playlist:
@@ -108,6 +110,7 @@ class Plex(object):
                                                                                           list_name=playlist_name))
                 user_server = self._get_plex_instance_for_user(user=user)
                 user_server.remove_from_playlist(playlist_name=playlist_name, items=items)
+                time.sleep(2)  # don't DDOS your own server
         else:
             playlist = self._get_existing_playlist(playlist_name=playlist_name)
             if playlist:
@@ -136,6 +139,7 @@ class Plex(object):
                                                                                   user_name=user.username))
                 user_server = self._get_plex_instance_for_user(user=user)
                 user_server.reset_playlist(playlist_name=playlist_name, new_items=new_items)
+                time.sleep(2)  # don't DDOS your own server
         else:
             playlist = self._get_existing_playlist(playlist_name=playlist_name)
             if playlist:
