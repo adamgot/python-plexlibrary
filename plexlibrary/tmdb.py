@@ -8,6 +8,7 @@ except ImportError:
     from pickle import UnpicklingError
 
 import requests
+import logs
 
 
 class TMDb(object):
@@ -42,7 +43,7 @@ class TMDb(object):
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
-            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            logs.info(u"Waiting 10 seconds for the TMDb rate limit...")
             time.sleep(10)
             self.request_count = 0
 
@@ -84,7 +85,7 @@ class TMDb(object):
                 cache = shelve.open(self.cache_file, 'n')
             except:
                 # Unknown cache file error, clear
-                print(u"Error in loading cache: {}".format(e))
+                logs.error(u"Error in loading cache: {}".format(e))
                 cache.close()
                 cache = shelve.open(self.cache_file, 'n')
             else:
@@ -94,7 +95,7 @@ class TMDb(object):
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
-            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            logs.info(u"Waiting 10 seconds for the TMDb rate limit...")
             time.sleep(10)
             self.request_count = 0
 
@@ -142,7 +143,7 @@ class TMDb(object):
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
-            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            logs.info(u"Waiting 10 seconds for the TMDb rate limit...")
             time.sleep(10)
             self.request_count = 0
 

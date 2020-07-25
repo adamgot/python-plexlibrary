@@ -9,6 +9,8 @@ import random
 import subprocess
 import sys
 import time
+import logging
+import logs
 
 import plexapi
 
@@ -20,6 +22,9 @@ import tvdb
 from config import ConfigParser
 from recipes import RecipeParser
 from utils import Colors, add_years
+
+logging.basicConfig(format='%(levelname)s:%(message)s',
+                    level=logging.INFO)
 
 
 class Recipe(object):
@@ -75,31 +80,33 @@ class Recipe(object):
         item_ids = []
 
         for url in self.recipe['source_list_urls']:
+            max_age = (self.recipe['new_playlist']['max_age'] if self.use_playlists
+                       else self.recipe['new_library']['max_age'])
             if 'api.trakt.tv' in url:
                 (item_list, item_ids) = self.trakt.add_items(
                     self.library_type, url, item_list, item_ids,
-                    self.recipe['new_library']['max_age'] or 0)
+                    max_age or 0)
             elif 'imdb.com/chart' in url:
                 (item_list, item_ids) = self.imdb.add_items(
                     self.library_type, url, item_list, item_ids,
-                    self.recipe['new_library']['max_age'] or 0)
+                    max_age or 0)
             else:
                 raise Exception("Unsupported source list: {url}".format(
                     url=url))
 
         if self.recipe['weighted_sorting']['enabled']:
             if self.config['tmdb']['api_key']:
-                print(u"Getting data from TMDb to add weighted sorting...")
+                logs.info(u"Getting data from TMDb to add weighted sorting...")
                 item_list = self.weighted_sorting(item_list)
             else:
-                print(u"Warning: TMDd API key is required "
-                      u"for weighted sorting")
+                logs.warning(u"Warning: TMDd API key is required "
+                             u"for weighted sorting")
         return item_list, item_ids
 
     def _get_plex_libraries(self):
         source_libraries = []
         for library_config in self.source_library_config:
-            print(u"Trying to match with items from the '{}' library ".format(
+            logs.info(u"Trying to match with items from the '{}' library ".format(
                 library_config['name']))
             try:
                 source_library = self.plex.server.library.section(
@@ -120,7 +127,8 @@ class Recipe(object):
         missing_items = []
         matching_total = 0
         nonmatching_idx = []
-        max_count = self.recipe['new_library']['max_count']
+        max_count = (self.recipe['new_playlist']['max_count'] if self.use_playlists
+                     else self.recipe['new_library']['max_count'])
 
         for i, item in enumerate(item_list):
             match = False
@@ -165,34 +173,33 @@ class Recipe(object):
                     matching_items.append(r)
 
             if match:
-                if self.recipe['new_library']['sort_title']['absolute']:
-                    print(u"{} {} ({})".format(
+                if not self.use_playlists and self.recipe['new_library']['sort_title']['absolute']:
+                    logs.info(u"{} {} ({})".format(
                         i + 1, item['title'], item['year']))
                 else:
-                    print(u"{} {} ({})".format(
+                    logs.info(u"{} {} ({})".format(
                         matching_total, item['title'], item['year']))
             else:
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
 
-        if not self.recipe['new_library']['sort_title']['absolute']:
+        if not self.use_playlists and not self.recipe['new_library']['sort_title']['absolute']:
             for i in reversed(nonmatching_idx):
                 del item_list[i]
 
         return matching_items, missing_items, matching_total, nonmatching_idx, max_count
 
     def _create_symbolic_links(self, matching_items, matching_total):
-        print(u"Creating symlinks for {count} matching items in the "
-              u"library...".format(count=matching_total))
+        logs.info(u"Creating symlinks for {count} matching items in the "
+                  u"library...".format(count=matching_total))
 
         try:
             if not os.path.exists(self.recipe['new_library']['folder']):
                 os.mkdir(self.recipe['new_library']['folder'])
         except:
-            print(u"Unable to create the new library folder "
-                  u"'{folder}'.".format(
-                folder=self.recipe['new_library']['folder']))
-            print(u"Exiting script.")
+            logs.error(u"Unable to create the new library folder "
+                       u"'{folder}'.".format(folder=self.recipe['new_library']['folder']))
+            logs.info(u"Exiting script.")
             return 0
 
         count = 0
@@ -261,7 +268,7 @@ class Recipe(object):
                                 new_items.append(movie)
                                 updated_paths.append(new_path)
                             except Exception as e:
-                                print(u"Symlink failed for {path}: {e}".format(
+                                logs.error(u"Symlink failed for {path}: {e}".format(
                                     path=new_path, e=e))
         else:
             for tv_show in matching_items:
@@ -307,22 +314,22 @@ class Recipe(object):
                                     done = True
                                     break
                                 except Exception as e:
-                                    print(u"Symlink failed for {path}: {e}"
-                                          .format(path=new_path, e=e))
+                                    logs.error(u"Symlink failed for {path}: {e}"
+                                               .format(path=new_path, e=e))
                             else:
                                 done = True
                                 break
 
-        print(u"Created symlinks for {count} new items:".format(count=count))
+        logs.info(u"Created symlinks for {count} new items:".format(count=count))
         for item in new_items:
-            print(u"{title} ({year})".format(title=item.title, year=item.year))
+            logs.info(u"{title} ({year})".format(title=item.title, year=item.year))
 
     def _verify_new_library_and_get_items(self, create_if_not_found=False):
         # Check if the new library exists in Plex
         try:
             new_library = self.plex.server.library.section(
                 self.recipe['new_library']['name'])
-            print(u"Library already exists in Plex. Scanning the library...")
+            logs.warning(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
         except plexapi.exceptions.NotFound:
@@ -337,9 +344,8 @@ class Recipe(object):
                 raise Exception("Library '{library}' does not exist".format(
                     library=self.recipe['new_library']['name']))
 
-
         # Wait for metadata to finish downloading before continuing
-        print(u"Waiting for metadata to finish downloading...")
+        logs.info(u"Waiting for metadata to finish downloading...")
         new_library = self.plex.server.library.section(
             self.recipe['new_library']['name'])
         while new_library.refreshing:
@@ -348,8 +354,8 @@ class Recipe(object):
                 self.recipe['new_library']['name'])
 
         # Retrieve a list of items from the new library
-        print(u"Retrieving a list of items from the '{library}' library in "
-              u"Plex...".format(library=self.recipe['new_library']['name']))
+        logs.info(u"Retrieving a list of items from the '{library}' library in "
+                  u"Plex...".format(library=self.recipe['new_library']['name']))
         return new_library, new_library.all()
 
     def _get_imdb_dict(self, media_items, item_ids, force_match=False):
@@ -391,7 +397,7 @@ class Recipe(object):
 
     def _modify_sort_titles_and_cleanup(self, item_list, imdb_map, new_library, sort_only=False):
         if self.recipe['new_library']['sort']:
-            print(u"Setting the sort titles for the '{}' library...".format(
+            logs.info(u"Setting the sort titles for the '{}' library...".format(
                 self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
             for i, m in enumerate(item_list):
@@ -438,119 +444,119 @@ class Recipe(object):
         return all_new_items
 
     def _remove_old_items_from_library(self, imdb_map):
-            print(u"Removing symlinks for items "
+        logs.info(u"Removing symlinks for items "
                   "which no longer qualify ".format(
-                library=self.recipe['new_library']['name']))
-            count = 0
-            updated_paths = []
-            deleted_items = []
-            max_date = add_years(
-                (self.recipe['new_library']['max_age'] or 0) * -1)
-            if self.library_type == 'movie':
-                for movie in imdb_map.values():
-                    if not self.recipe['new_library']['remove_from_library']:
-                        # Only remove older than max_age
-                        if not self.recipe['new_library']['max_age'] \
-                                or (max_date < movie.originallyAvailableAt):
-                            imdb_map.pop(m['id'], None)
-                            continue
+            library=self.recipe['new_library']['name']))
+        count = 0
+        updated_paths = []
+        deleted_items = []
+        max_date = add_years(
+            (self.recipe['new_library']['max_age'] or 0) * -1)
+        if self.library_type == 'movie':
+            for movie in imdb_map.values():
+                if not self.recipe['new_library']['remove_from_library']:
+                    # Only remove older than max_age
+                    if not self.recipe['new_library']['max_age'] \
+                            or (max_date < movie.originallyAvailableAt):
+                        imdb_map.pop(m['id'], None)
+                        continue
 
-                    for part in movie.iterParts():
+                for part in movie.iterParts():
+                    old_path_file = part.file
+                    old_path, file_name = os.path.split(old_path_file)
+
+                    folder_name = os.path.relpath(
+                        old_path, self.recipe['new_library']['folder'])
+
+                    if folder_name == '.':
+                        new_path = os.path.join(
+                            self.recipe['new_library']['folder'],
+                            file_name)
+                        dir = False
+                    else:
+                        new_path = os.path.join(
+                            self.recipe['new_library']['folder'],
+                            folder_name)
+                        dir = True
+
+                    if (dir and os.path.exists(new_path)) or (
+                            not dir and os.path.isfile(new_path)):
+                        try:
+                            if os.name == 'nt':
+                                # Python 3.2+ only
+                                if sys.version_info < (3, 2):
+                                    assert os.path.islink(new_path)
+                                if dir:
+                                    os.rmdir(new_path)
+                                else:
+                                    os.remove(new_path)
+                            else:
+                                assert os.path.islink(new_path)
+                                os.unlink(new_path)
+                            count += 1
+                            deleted_items.append(movie)
+                            updated_paths.append(new_path)
+                        except Exception as e:
+                            logs.error(u"Remove symlink failed for "
+                                       "{path}: {e}".format(path=new_path, e=e))
+        else:
+            for tv_show in imdb_map.values():
+                done = False
+                if done:
+                    continue
+                for episode in tv_show.episodes():
+                    if done:
+                        break
+                    for part in episode.iterParts():
+                        if done:
+                            break
                         old_path_file = part.file
                         old_path, file_name = os.path.split(old_path_file)
 
-                        folder_name = os.path.relpath(
-                            old_path, self.recipe['new_library']['folder'])
+                        folder_name = ''
+                        new_library_folder = \
+                            self.recipe['new_library']['folder']
+                        old_path = os.path.join(
+                            new_library_folder,
+                            old_path.replace(new_library_folder, '').strip(
+                                os.sep).split(os.sep)[0])
+                        folder_name = os.path.relpath(old_path,
+                                                      new_library_folder)
 
-                        if folder_name == '.':
-                            new_path = os.path.join(
-                                self.recipe['new_library']['folder'],
-                                file_name)
-                            dir = False
-                        else:
-                            new_path = os.path.join(
-                                self.recipe['new_library']['folder'],
-                                folder_name)
-                            dir = True
-
-                        if (dir and os.path.exists(new_path)) or (
-                                not dir and os.path.isfile(new_path)):
+                        new_path = os.path.join(
+                            self.recipe['new_library']['folder'],
+                            folder_name)
+                        if os.path.exists(new_path):
                             try:
                                 if os.name == 'nt':
                                     # Python 3.2+ only
                                     if sys.version_info < (3, 2):
                                         assert os.path.islink(new_path)
-                                    if dir:
-                                        os.rmdir(new_path)
-                                    else:
-                                        os.remove(new_path)
+                                    os.rmdir(new_path)
                                 else:
                                     assert os.path.islink(new_path)
                                     os.unlink(new_path)
                                 count += 1
-                                deleted_items.append(movie)
+                                deleted_items.append(tv_show)
                                 updated_paths.append(new_path)
-                            except Exception as e:
-                                print(u"Remove symlink failed for "
-                                      "{path}: {e}".format(path=new_path, e=e))
-            else:
-                for tv_show in imdb_map.values():
-                    done = False
-                    if done:
-                        continue
-                    for episode in tv_show.episodes():
-                        if done:
-                            break
-                        for part in episode.iterParts():
-                            if done:
-                                break
-                            old_path_file = part.file
-                            old_path, file_name = os.path.split(old_path_file)
-
-                            folder_name = ''
-                            new_library_folder = \
-                                self.recipe['new_library']['folder']
-                            old_path = os.path.join(
-                                new_library_folder,
-                                old_path.replace(new_library_folder, '').strip(
-                                    os.sep).split(os.sep)[0])
-                            folder_name = os.path.relpath(old_path,
-                                                          new_library_folder)
-
-                            new_path = os.path.join(
-                                self.recipe['new_library']['folder'],
-                                folder_name)
-                            if os.path.exists(new_path):
-                                try:
-                                    if os.name == 'nt':
-                                        # Python 3.2+ only
-                                        if sys.version_info < (3, 2):
-                                            assert os.path.islink(new_path)
-                                        os.rmdir(new_path)
-                                    else:
-                                        assert os.path.islink(new_path)
-                                        os.unlink(new_path)
-                                    count += 1
-                                    deleted_items.append(tv_show)
-                                    updated_paths.append(new_path)
-                                    done = True
-                                    break
-                                except Exception as e:
-                                    print(u"Remove symlink failed for "
-                                          "{path}: {e}".format(path=new_path,
-                                                               e=e))
-                            else:
                                 done = True
                                 break
+                            except Exception as e:
+                                logs.error(u"Remove symlink failed for "
+                                           "{path}: {e}".format(path=new_path,
+                                                                e=e))
+                        else:
+                            done = True
+                            break
 
-            print(u"Removed symlinks for {count} items.".format(count=count))
-            for item in deleted_items:
-                print(u"{title} ({year})".format(title=item.title,
+        logs.info(u"Removed symlinks for {count} items.".format(count=count))
+        for item in deleted_items:
+            logs.info(u"{title} ({year})".format(title=item.title,
                                                  year=item.year))
 
     def _cleanup_new_library(self, new_library):
         # Scan the library to clean up the deleted items
-        print(u"Scanning the '{library}' library...".format(
+        logs.info(u"Scanning the '{library}' library...".format(
             library=self.recipe['new_library']['name']))
         new_library.update()
         time.sleep(10)
@@ -567,7 +573,7 @@ class Recipe(object):
         while imdb_map:
             imdb_id, item = imdb_map.popitem()
             i += 1
-            print(u"{} {} ({})".format(i, item.title, item.year))
+            logs.info(u"{} {} ({})".format(i, item.title, item.year))
             self.plex.set_sort_title(
                 new_library.key, item.ratingKey, i, item.title,
                 self.library_type,
@@ -588,12 +594,17 @@ class Recipe(object):
 
         if self.use_playlists:
             # Start playlist process
-            if self.recipe['new_library']['remove_from_library'] or self.recipe['new_library'].get('remove_old', False):
+            if self.recipe['new_playlist']['remove_from_playlist'] or self.recipe['new_playlist'].get('remove_old',
+                                                                                                      False):
                 # Start playlist over again
-                self.plex.reset_playlist(playlist_name=self.recipe['new_playlist']['name'], new_items=matching_items)
+                self.plex.reset_playlist(playlist_name=self.recipe['new_playlist']['name'], new_items=matching_items,
+                                         user_names=self.recipe['new_playlist']['share_to_users'],
+                                         all_users=self.recipe['new_playlist']['share_to_all'])
             else:
                 # Keep existing items
-                self.plex.add_to_playlist(playlist_name=self.recipe['new_playlist']['name'], items=matching_items)
+                self.plex.add_to_playlist(playlist_name=self.recipe['new_playlist']['name'], items=matching_items,
+                                          user_names=self.recipe['new_playlist']['share_to_users'],
+                                          all_users=self.recipe['new_playlist']['share_to_all'])
             playlist_items = self.plex.get_playlist_items(playlist_name=self.recipe['new_playlist']['name'])
             return missing_items, (len(playlist_items) if playlist_items else 0)
         else:
@@ -601,13 +612,15 @@ class Recipe(object):
             # Create symlinks for all items in your library on the trakt watched
             self._create_symbolic_links(matching_items=matching_items, matching_total=matching_total)
             # Post-process new library
-            print(u"Creating the '{}' library in Plex...".format(
+            logs.info(u"Creating the '{}' library in Plex...".format(
                 self.recipe['new_library']['name']))
             new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=True)
             # Create a dictionary of {imdb_id: item}
-            imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids, force_match=force_imdb_id_match)
+            imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids,
+                                           force_match=force_imdb_id_match)
             # Modify the sort titles
-            all_new_items = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library, sort_only=False)
+            all_new_items = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map,
+                                                                 new_library=new_library, sort_only=False)
             return missing_items, len(all_new_items)
 
     def _run_sort_only(self):
@@ -619,25 +632,26 @@ class Recipe(object):
         # Create a dictionary of {imdb_id: item}
         imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids, force_match=force_imdb_id_match)
         # Modify the sort titles
-        _ = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library, sort_only=True)
+        _ = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library,
+                                                 sort_only=True)
         return len(all_new_items)
 
     def run(self, sort_only=False):
         if sort_only:
-            print(u"Running the recipe '{}', sorting only".format(
+            logs.info(u"Running the recipe '{}', sorting only".format(
                 self.recipe_name))
             list_count = self._run_sort_only()
-            print(u"Number of items in the new library: {count}".format(
-                count=list_count))
+            logs.info(u"Number of items in the new {library_or_playlist}: {count}".format(
+                count=list_count, library_or_playlist=('playlist' if self.use_playlists else 'library')))
         else:
-            print(u"Running the recipe '{}'".format(self.recipe_name))
+            logs.info(u"Running the recipe '{}'".format(self.recipe_name))
             missing_items, list_count = self._run()
-            print(u"Number of items in the new library: {count}".format(
-                count=list_count))
-            print(u"Number of missing items: {count}".format(
+            logs.info(u"Number of items in the new {library_or_playlist}: {count}".format(
+                count=list_count, library_or_playlist=('playlist' if self.use_playlists else 'library')))
+            logs.info(u"Number of missing items: {count}".format(
                 count=len(missing_items)))
             for idx, item in missing_items:
-                print(u"{idx}\t{release}\t{imdb_id}\t{title} ({year})".format(
+                logs.info(u"{idx}\t{release}\t{imdb_id}\t{title} ({year})".format(
                     idx=idx + 1, release=item.get('release_date', ''),
                     imdb_id=item['id'], title=item['title'],
                     year=item['year']))
@@ -695,7 +709,7 @@ class Recipe(object):
             m['original_idx'] = i + 1
             details = self.tmdb.get_details(m['tmdb_id'], self.library_type)
             if not details:
-                print(u"Warning: No TMDb data for {}".format(m['title']))
+                logs.warning(u"Warning: No TMDb data for {}".format(m['title']))
                 continue
             m['tmdb_popularity'] = float(details['popularity'])
             m['tmdb_vote'] = float(details['vote_average'])
@@ -774,17 +788,17 @@ class Recipe(object):
             net += str(abs(i + 1 - m['original_idx'])).rjust(3)
             try:
                 # TODO
-                print(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, "
-                      "w_vote:{:0<5}; age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; "
-                      "w_cmb:{:0<5}; {} {}{}"
-                      .format(net, i + 1, m['original_idx'],
-                              round(m['index_weight'], 3),
-                              m.get('tmdb_vote', 0.0),
-                              round(m['vote_weight'], 3), m.get('age', 0),
-                              round(m['age_weight'], 3),
-                              round(m.get('random_weight', 0), 3),
-                              round(m['weight'], 3), str(m['title']),
-                              str(m['year']), Colors.RESET))
+                logs.info(u"{} {:>3}: trnd:{:>3}, w_trnd:{:0<5}; vote:{}, "
+                          "w_vote:{:0<5}; age:{:>4}, w_age:{:0<5}; w_rnd:{:0<5}; "
+                          "w_cmb:{:0<5}; {} {}{}"
+                          .format(net, i + 1, m['original_idx'],
+                                  round(m['index_weight'], 3),
+                                  m.get('tmdb_vote', 0.0),
+                                  round(m['vote_weight'], 3), m.get('age', 0),
+                                  round(m['age_weight'], 3),
+                                  round(m.get('random_weight', 0), 3),
+                                  round(m['weight'], 3), str(m['title']),
+                                  str(m['year']), Colors.RESET))
             except UnicodeEncodeError:
                 pass
 

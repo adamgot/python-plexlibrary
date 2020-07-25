@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import glob
 import os
+import logs
 
 from utils import YAMLBase
 
@@ -21,7 +22,7 @@ class RecipeParser(YAMLBase):
         super(RecipeParser, self).__init__(filepath)
 
     def dump(self):
-        print(self.data)
+        logs.info(self.data)
 
 
 def get_recipes(directory=None):

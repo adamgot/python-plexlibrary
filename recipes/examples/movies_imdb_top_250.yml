@@ -16,6 +16,22 @@ source_libraries:
     folders:
       - '/path/to/Different Movies'
 
+# New playlist details
+new_playlist:
+  name: 'Movies - IMDB Top 250'
+  # Limit the age (in years) of items to be considered
+  # * 0 for no limit
+  max_age: 0
+  # Maximum number of items to keep in the library
+  max_count: 250
+  # Remove items that no longer exist in the source lists
+  remove_from_playlist: true
+  share_to_users:
+    - username1
+    - username2
+    - username3
+  share_to_all: false
+
 # New library details
 new_library:
   name: 'Movies - IMDB Top 250'
