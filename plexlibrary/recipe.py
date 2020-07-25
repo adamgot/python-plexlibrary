@@ -445,8 +445,7 @@ class Recipe(object):
 
     def _remove_old_items_from_library(self, imdb_map):
         logs.info(u"Removing symlinks for items "
-                  "which no longer qualify ".format(
-            library=self.recipe['new_library']['name']))
+                  "which no longer qualify ".format(library=self.recipe['new_library']['name']))
         count = 0
         updated_paths = []
         deleted_items = []
@@ -728,8 +727,11 @@ class Recipe(object):
                         details['release_date'], '%Y-%m-%d').date()
                 item_age_td = today - m['release_date']
             elif self.library_type == 'tv':
-                m['last_air_date'] = datetime.datetime.strptime(
-                    details['last_air_date'], '%Y-%m-%d').date()
+                try:
+                    m['last_air_date'] = datetime.datetime.strptime(
+                        details['last_air_date'], '%Y-%m-%d').date()
+                except TypeError:
+                    m['last_air_date'] = today
                 item_age_td = today - m['last_air_date']
             m['genres'] = [g['name'].lower() for g in details['genres']]
             m['age'] = item_age_td.days
