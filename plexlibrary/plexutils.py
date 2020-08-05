@@ -7,7 +7,6 @@ from typing import List
 
 import logs
 
-
 class Plex(object):
     def __init__(self, baseurl, token):
         self.baseurl = baseurl
