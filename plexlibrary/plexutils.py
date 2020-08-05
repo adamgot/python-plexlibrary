@@ -2,9 +2,10 @@
 import plexapi.server
 import plexapi.media
 import requests
-import logs
 import time
 from typing import List
+
+import logs
 
 
 class Plex(object):
