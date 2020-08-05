@@ -3,8 +3,8 @@ import datetime
 
 import requests
 from lxml import html
-import logs
 
+import logs
 from utils import add_years
 
 
