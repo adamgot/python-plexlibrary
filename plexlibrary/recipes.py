@@ -69,7 +69,7 @@ class RecipeParser(YAMLBase):
         if not self.get('weighted_sorting'):
             raise Exception("Missing 'weighted_sorting' in recipe")
         else:
-            if not self['weighted_sorting'].get('enabled'):
+            if 'enabled' not in self['weighted_sorting']:
                 raise Exception("Missing 'enabled' in 'weighted_sorting'")
             else:
                 if 'better_release_date' not in self['weighted_sorting']:

@@ -83,8 +83,8 @@ class Recipe(object):
         item_ids = []
 
         for url in self.recipe['source_list_urls']:
-            max_age = (self.recipe['new_playlist']['max_age'] if self.use_playlists
-                       else self.recipe['new_library']['max_age'])
+            max_age = (self.recipe['new_playlist'].get('max_age', 0) if self.use_playlists
+                       else self.recipe['new_library'].get('max_age', 0))
             if 'api.trakt.tv' in url:
                 (item_list, item_ids) = self.trakt.add_items(
                     self.library_type, url, item_list, item_ids,
@@ -130,8 +130,8 @@ class Recipe(object):
         missing_items = []
         matching_total = 0
         nonmatching_idx = []
-        max_count = (self.recipe['new_playlist']['max_count'] if self.use_playlists
-                     else self.recipe['new_library']['max_count'])
+        max_count = (self.recipe['new_playlist'].get('max_count', 0) if self.use_playlists
+                     else self.recipe['new_library'].get('max_count', 0))
 
         for i, item in enumerate(item_list):
             match = False
@@ -603,16 +603,16 @@ class Recipe(object):
                                                                                                       False):
                 # Start playlist over again
                 self.plex.reset_playlist(playlist_name=self.recipe['new_playlist']['name'], new_items=matching_items,
-                                         user_names=self.recipe['new_playlist']['share_to_users'],
+                                         user_names=self.recipe['new_playlist'].get('share_to_users', []),
                                          all_users=(share_playlist_to_all if share_playlist_to_all else
-                                                    self.recipe['new_playlist']['share_to_all']))
+                                                    self.recipe['new_playlist'].get('share_to_all', False)))
             else:
                 # Keep existing items
                 self.plex.add_to_playlist_for_users(playlist_name=self.recipe['new_playlist']['name'],
                                                     items=matching_items,
-                                                    user_names=self.recipe['new_playlist']['share_to_users'],
+                                                    user_names=self.recipe['new_playlist'].get('share_to_users', []),
                                                     all_users=(share_playlist_to_all if share_playlist_to_all else
-                                                               self.recipe['new_playlist']['share_to_all']))
+                                                               self.recipe['new_playlist'].get('share_to_all', False)))
             playlist_items = self.plex.get_playlist_items(playlist_name=self.recipe['new_playlist']['name'])
             return missing_items, (len(playlist_items) if playlist_items else 0)
         else:
