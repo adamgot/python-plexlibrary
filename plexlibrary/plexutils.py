@@ -7,6 +7,7 @@ from typing import List
 
 import logs
 
+
 class Plex(object):
     def __init__(self, baseurl, token):
         self.baseurl = baseurl
@@ -74,48 +75,50 @@ class Plex(object):
             return playlist.items()
         return []
 
-    def add_to_playlist(self, playlist_name, items: List[plexapi.media.Media], user_names: List = None,
-                        all_users: bool = False):
+    def add_to_playlist_for_users(self, playlist_name, items: List[plexapi.media.Media], user_names: List = None,
+                                  all_users: bool = False):
         users = []
         if all_users:
             users = self._get_all_users()
         elif user_names:
             users = self._get_specific_users(user_names=user_names)
-        if users:  # recursively add to self and for each user
-            self.add_to_playlist(playlist_name=playlist_name, items=items)
-            for user in users:
-                logs.info("Adding items to {user_name}'s {list_name} playlist".format(user_name=user.username,
-                                                                                      list_name=playlist_name))
-                user_server = self._get_plex_instance_for_user(user=user)
-                user_server.add_to_playlist(playlist_name=playlist_name, items=items)
-                time.sleep(2)  # don't DDOS your own server
-        else:
-            playlist = self._get_existing_playlist(playlist_name=playlist_name)
-            if playlist:
-                playlist.addItems(items=items)
-            else:
-                self._create_new_playlist(playlist_name=playlist_name, items=items)
+        # add on admin account
+        self.add_to_playlist(playlist_name=playlist_name, items=items)
+        # add for all other users
+        for user in users:
+            logs.info("Adding items to {user_name}'s {list_name} playlist".format(user_name=user.username,
+                                                                                  list_name=playlist_name))
+            user_server = self._get_plex_instance_for_user(user=user)
+            user_server.add_to_playlist(playlist_name=playlist_name, items=items)
 
-    def remove_from_playlist(self, playlist_name, items: List[plexapi.media.Media], user_names: List = None,
-                             all_users: bool = False):
+    def add_to_playlist(self, playlist_name, items: List[plexapi.media.Media]):
+        playlist = self._get_existing_playlist(playlist_name=playlist_name)
+        if playlist:
+            playlist.addItems(items=items)
+        else:
+            self._create_new_playlist(playlist_name=playlist_name, items=items)
+
+    def remove_from_playlist_for_users(self, playlist_name, items: List[plexapi.media.Media], user_names: List = None,
+                                       all_users: bool = False):
         users = []
         if all_users:
             users = self._get_all_users()
         elif user_names:
             users = self._get_specific_users(user_names=user_names)
-        if users:  # recursively remove from self and for each user
-            self.remove_from_playlist(playlist_name=playlist_name, items=items)
-            for user in users:
-                logs.info("Removing items from {user_name}'s {list_name} playlist".format(user_name=user.username,
-                                                                                          list_name=playlist_name))
-                user_server = self._get_plex_instance_for_user(user=user)
-                user_server.remove_from_playlist(playlist_name=playlist_name, items=items)
-                time.sleep(2)  # don't DDOS your own server
-        else:
-            playlist = self._get_existing_playlist(playlist_name=playlist_name)
-            if playlist:
-                for item in items:
-                    playlist.removeItem(item=item)
+        # remove on admin account
+        self.remove_from_playlist(playlist_name=playlist_name, items=items)
+        # remove for all other users
+        for user in users:
+            logs.info("Removing items from {user_name}'s {list_name} playlist".format(user_name=user.username,
+                                                                                      list_name=playlist_name))
+            user_server = self._get_plex_instance_for_user(user=user)
+            user_server.remove_from_playlist(playlist_name=playlist_name, items=items)
+
+    def remove_from_playlist(self, playlist_name, items: List[plexapi.media.Media]):
+        playlist = self._get_existing_playlist(playlist_name=playlist_name)
+        if playlist:
+            for item in items:
+                playlist.removeItem(item=item)
 
     def reset_playlist(self, playlist_name, new_items: List[plexapi.media.Media], user_names: List = None,
                        all_users: bool = False):
