@@ -14,12 +14,28 @@ source_list_urls:
 # Source library details
 source_libraries:
   - name: 'Movies'
-  - name: 'Movies (4K)'
+    folders:
+      - '/path/to/Movies'
+      - '/path/to/More Movies'
+  - name: 'Different Movies'
+    folders:
+      - '/path/to/Different Movies'
 
 # New playlist details
 new_playlist:
-  name: 'Trending Movies'
+  name: 'Movies - Trending'
+  # Limit the age (in years) of items to be considered
+  # * 0 for no limit
+  max_age: 3
+  # Maximum number of items to keep in the library
+  max_count: 250
+  # Remove items that no longer exist in the source lists
   remove_from_playlist: true
+  share_to_users:
+    - username1
+    - username2
+    - username3
+  share_to_all: false
 
 # New library details
 new_library:

@@ -4,6 +4,7 @@ import datetime
 import requests
 from lxml import html
 
+import logs
 from utils import add_years
 
 
@@ -35,7 +36,7 @@ class IMDb(object):
         if not movie_ids:
             movie_ids = []
         max_date = add_years(max_age * -1)
-        print(u"Retrieving the IMDB list: {}".format(url))
+        logs.info(u"Retrieving the IMDB list: {}".format(url))
 
         (imdb_ids, imdb_titles, imdb_years) = self._handle_request(url)
         for i, imdb_id in enumerate(imdb_ids):
@@ -76,7 +77,7 @@ class IMDb(object):
         if not show_ids:
             show_ids = []
         curyear = datetime.datetime.now().year
-        print(u"Retrieving the IMDb list: {}".format(url))
+        logs.info(u"Retrieving the IMDb list: {}".format(url))
         data = {}
         if max_age != 0:
             data['extended'] = 'full'
