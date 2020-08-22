@@ -39,10 +39,18 @@ class Plex(object):
 
         url = '{base_url}/library/sections'.format(base_url=self.baseurl)
         requests.post(url, headers=headers, params=params)
+        
+    def _user_has_access(self, user):
+        for server in user.servers:
+            if server.machineIdentifier == self.server.machineIdentifier:
+                return True
+        return False
 
     def _get_plex_instance_for_user(self, user):
-        return Plex(baseurl=self.baseurl, token=self.server.myPlexAccount().user(user.username).get_token(
-            self.server.machineIdentifier))
+        if self._user_has_access(user):
+            return Plex(baseurl=self.baseurl, token=self.server.myPlexAccount().user(user.username).get_token(
+                self.server.machineIdentifier))
+        return None
 
     def _get_all_users(self):
         return self.server.myPlexAccount().users()
@@ -62,7 +70,8 @@ class Plex(object):
             users = self._get_specific_users(user_names=[user_name])
             if users:
                 user_server = self._get_plex_instance_for_user(user=users[0])
-                return user_server._get_existing_playlist(playlist_name=playlist_name)
+                if user_server:
+                    return user_server._get_existing_playlist(playlist_name=playlist_name)
         else:
             for playlist in self.server.playlists():
                 if playlist.title == playlist_name:
@@ -89,7 +98,8 @@ class Plex(object):
             logs.info("Adding items to {user_name}'s {list_name} playlist".format(user_name=user.username,
                                                                                   list_name=playlist_name))
             user_server = self._get_plex_instance_for_user(user=user)
-            user_server.add_to_playlist(playlist_name=playlist_name, items=items)
+            if user_server:
+                user_server.add_to_playlist(playlist_name=playlist_name, items=items)
 
     def add_to_playlist(self, playlist_name, items: List[plexapi.media.Media]):
         playlist = self._get_existing_playlist(playlist_name=playlist_name)
@@ -112,7 +122,8 @@ class Plex(object):
             logs.info("Removing items from {user_name}'s {list_name} playlist".format(user_name=user.username,
                                                                                       list_name=playlist_name))
             user_server = self._get_plex_instance_for_user(user=user)
-            user_server.remove_from_playlist(playlist_name=playlist_name, items=items)
+            if user_server:
+                user_server.remove_from_playlist(playlist_name=playlist_name, items=items)
 
     def remove_from_playlist(self, playlist_name, items: List[plexapi.media.Media]):
         playlist = self._get_existing_playlist(playlist_name=playlist_name)
@@ -141,8 +152,8 @@ class Plex(object):
                 logs.info("Resetting {list_name} playlist for {user_name}".format(list_name=playlist_name,
                                                                                   user_name=user.username))
                 user_server = self._get_plex_instance_for_user(user=user)
-                user_server.reset_playlist(playlist_name=playlist_name, new_items=new_items)
-                time.sleep(2)  # don't DDOS your own server
+                if user_server:
+                    user_server.reset_playlist(playlist_name=playlist_name, new_items=new_items)
         else:
             playlist = self._get_existing_playlist(playlist_name=playlist_name)
             if playlist:
