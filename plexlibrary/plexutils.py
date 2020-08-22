@@ -72,6 +72,8 @@ class Plex(object):
                 user_server = self._get_plex_instance_for_user(user=users[0])
                 if user_server:
                     return user_server._get_existing_playlist(playlist_name=playlist_name)
+                else:
+                    logs.info(f"{user_name} does not have access to your server.")
         else:
             for playlist in self.server.playlists():
                 if playlist.title == playlist_name:
@@ -100,6 +102,8 @@ class Plex(object):
             user_server = self._get_plex_instance_for_user(user=user)
             if user_server:
                 user_server.add_to_playlist(playlist_name=playlist_name, items=items)
+            else:
+                logs.info(f"{user.username} does not have access to your server.")
 
     def add_to_playlist(self, playlist_name, items: List[plexapi.media.Media]):
         playlist = self._get_existing_playlist(playlist_name=playlist_name)
@@ -124,6 +128,9 @@ class Plex(object):
             user_server = self._get_plex_instance_for_user(user=user)
             if user_server:
                 user_server.remove_from_playlist(playlist_name=playlist_name, items=items)
+            else:
+                logs.info(f"{user.username} does not have access to your server.")
+
 
     def remove_from_playlist(self, playlist_name, items: List[plexapi.media.Media]):
         playlist = self._get_existing_playlist(playlist_name=playlist_name)
@@ -154,6 +161,9 @@ class Plex(object):
                 user_server = self._get_plex_instance_for_user(user=user)
                 if user_server:
                     user_server.reset_playlist(playlist_name=playlist_name, new_items=new_items)
+                else:
+                    logs.info(f"{user.username} does not have access to your server.")
+
         else:
             playlist = self._get_existing_playlist(playlist_name=playlist_name)
             if playlist:
