@@ -436,14 +436,23 @@ class Recipe(object):
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible']
                     )
-                    if sort_only:
-                        self._pop_imdb_map(imdb_map=imdb_map, new_library=new_library)
-                        return True
-        if self.recipe['new_library']['remove_from_library'] or self.recipe['new_library'].get('remove_old', False):
+        if not sort_only and (
+                self.recipe['new_library']['remove_from_library'] or
+                self.recipe['new_library'].get('remove_old', False)):
             # Remove old items that no longer qualify
             self._remove_old_items_from_library(imdb_map=imdb_map)
             all_new_items = self._cleanup_new_library(new_library=new_library)
-            self._pop_imdb_map(imdb_map=imdb_map, new_library=new_library)
+        elif sort_only:
+            return True
+        while imdb_map:
+            imdb_id, item = imdb_map.popitem()
+            i += 1
+            logs.info(u"{} {} ({})".format(i, item.title, item.year))
+            self.plex.set_sort_title(
+                new_library.key, item.ratingKey, i, item.title,
+                self.library_type,
+                self.recipe['new_library']['sort_title']['format'],
+                self.recipe['new_library']['sort_title']['visible'])
         return all_new_items
 
     def _remove_old_items_from_library(self, imdb_map):
@@ -573,17 +582,6 @@ class Recipe(object):
                 self.recipe['new_library']['name'])
         new_library.emptyTrash()
         return new_library.all()
-
-    def _pop_imdb_map(self, imdb_map, new_library, i=0):
-        while imdb_map:
-            imdb_id, item = imdb_map.popitem()
-            i += 1
-            logs.info(u"{} {} ({})".format(i, item.title, item.year))
-            self.plex.set_sort_title(
-                new_library.key, item.ratingKey, i, item.title,
-                self.library_type,
-                self.recipe['new_library']['sort_title']['format'],
-                self.recipe['new_library']['sort_title']['visible'])
 
     def _run(self, share_playlist_to_all=False):
         # Get the trakt lists
