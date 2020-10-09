@@ -22,6 +22,9 @@ from config import ConfigParser
 from recipes import RecipeParser
 from utils import Colors, add_years
 
+# FixMe: Only required for temporary Plex Movie Agent workaround
+import xml.etree.ElementTree as ET
+import urllib.request
 
 class Recipe(object):
     plex = None
@@ -140,15 +143,22 @@ class Recipe(object):
                 continue
             res = []
             for source_library in source_libraries:
+                # FixMe: This search method cant be used until plexapi is updated to include imdb/tmdb ids
+                """
                 lres = source_library.search(guid='imdb://' + str(item['id']))
                 if not lres and item.get('tmdb_id'):
-                    lres += source_library.search(
-                        guid='themoviedb://' + str(item['tmdb_id']))
+                    lres += source_library.search(guid='tmdb://' + str(item['tmdb_id']))
                 if not lres and item.get('tvdb_id'):
-                    lres += source_library.search(
-                        guid='thetvdb://' + str(item['tvdb_id']))
+                    lres += source_library.search(guid='tvdb://' + str(item['tvdb_id']))
                 if lres:
                     res += lres
+                """
+                res = source_library.search(title=item['title'], year=item['year'])
+                if not res:
+                    res += source_library.search(title=item['title'], year=int(item['year']) + 1)
+                if not res:
+                    res += source_library.search(title=item['title'], year=int(item['year']) - 1)
+
             if not res:
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
@@ -166,6 +176,10 @@ class Recipe(object):
                     tvdb_id = (r.guid.split('thetvdb://')[1]
                         .split('?')[0]
                         .split('/')[0])
+
+                # FIXME: Temporary workaround until plexapi is updated to include the imdb/tmdb ids
+                if not imdb_id:
+                    imdb_id = self._get_imdb_from_plex_movie_agent(r)
 
                 if ((imdb_id and imdb_id == str(item['id']))
                         or (tmdb_id and tmdb_id == str(item['tmdb_id']))
@@ -191,6 +205,28 @@ class Recipe(object):
                 del item_list[i]
 
         return matching_items, missing_items, matching_total, nonmatching_idx, max_count
+
+    """ 
+        Work around for the new Plex Movie Agent until plexapi is updated 
+    """
+    def _get_imdb_from_plex_movie_agent(self, plex_api_result):
+        # Deal with the new Plex Agent method of delivering GUIDs by manually parsing the XML for the result
+        url = self.config['plex']['baseurl'] + plex_api_result.key + "?X-Plex-Token=" + self.config['plex']['token']
+        xml_data = urllib.request.urlopen(url).read()
+        root = ET.fromstring(xml_data)
+        imdb_id = None
+        tmdb_id = None
+        for guid in root.iter('Guid'):
+            guid_id = guid.get('id')
+            if 'imdb://' in guid_id:
+                imdb_id = guid_id.split('imdb://')[1]
+            elif not imdb_id and 'tmdb://' in guid_id:
+                tmdb_id = guid_id.split('tmdb://')[1]
+
+        if not imdb_id and tmdb_id is not None:
+            imdb_id = self.tmdb.get_imdb_id(tmdb_id)
+
+        return imdb_id
 
     def _create_symbolic_links(self, matching_items, matching_total):
         logs.info(u"Creating symlinks for {count} matching items in the "
