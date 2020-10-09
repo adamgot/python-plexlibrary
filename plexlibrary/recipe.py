@@ -143,21 +143,23 @@ class Recipe(object):
                 continue
             res = []
             for source_library in source_libraries:
-                # FixMe: This search method cant be used until plexapi is updated to include imdb/tmdb ids
-                """
                 lres = source_library.search(guid='imdb://' + str(item['id']))
                 if not lres and item.get('tmdb_id'):
-                    lres += source_library.search(guid='tmdb://' + str(item['tmdb_id']))
+                    lres += source_library.search(guid='themoviedb://' + str(item['tmdb_id']))
                 if not lres and item.get('tvdb_id'):
-                    lres += source_library.search(guid='tvdb://' + str(item['tvdb_id']))
+                    lres += source_library.search(guid='thetvdb://' + str(item['tvdb_id']))
                 if lres:
                     res += lres
-                """
-                res = source_library.search(title=item['title'], year=item['year'])
-                if not res:
-                    res += source_library.search(title=item['title'], year=int(item['year']) + 1)
-                if not res:
-                    res += source_library.search(title=item['title'], year=int(item['year']) - 1)
+                else:
+                    """
+                    Still no results, fall back to searching by title and 
+                    year because the user may be using the new Plex Movie Agent
+                    """
+                    res = source_library.search(title=item['title'], year=item['year'])
+                    if not res:
+                        res += source_library.search(title=item['title'], year=int(item['year']) + 1)
+                    if not res:
+                        res += source_library.search(title=item['title'], year=int(item['year']) - 1)
 
             if not res:
                 missing_items.append((i, item))
@@ -176,9 +178,8 @@ class Recipe(object):
                     tvdb_id = (r.guid.split('thetvdb://')[1]
                         .split('?')[0]
                         .split('/')[0])
-
-                # FIXME: Temporary workaround until plexapi is updated to include the imdb/tmdb ids
-                if not imdb_id:
+                elif r.guid is not None and 'plex://' in r.guid:
+                    # FIXME: Temporary workaround until plexapi is updated to include the imdb/tmdb ids
                     imdb_id = self._get_imdb_from_plex_movie_agent(r)
 
                 if ((imdb_id and imdb_id == str(item['id']))
