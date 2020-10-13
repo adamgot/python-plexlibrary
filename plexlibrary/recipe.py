@@ -180,7 +180,10 @@ class Recipe(object):
                         .split('/')[0])
                 elif r.guid is not None and 'plex://' in r.guid:
                     # FIXME: Temporary workaround until plexapi is updated to include the imdb/tmdb ids
-                    imdb_id = self._get_imdb_from_plex_movie_agent(r)
+                    matched_ids = self._get_other_agent_ids_from_plex_movie_agent(r)
+                    imdb_id = matched_ids['imdb']
+                    tmdb_id = matched_ids['tmdb']
+                    tvdb_id = matched_ids['tvdb']
 
                 if ((imdb_id and imdb_id == str(item['id']))
                         or (tmdb_id and tmdb_id == str(item['tmdb_id']))
@@ -210,24 +213,25 @@ class Recipe(object):
     """ 
         Work around for the new Plex Movie Agent until plexapi is updated 
     """
-    def _get_imdb_from_plex_movie_agent(self, plex_api_result):
+    def _get_other_agent_ids_from_plex_movie_agent(self, plex_api_result):
         # Deal with the new Plex Agent method of delivering GUIDs by manually parsing the XML for the result
         url = self.config['plex']['baseurl'] + plex_api_result.key + "?X-Plex-Token=" + self.config['plex']['token']
         xml_data = urllib.request.urlopen(url).read()
         root = ET.fromstring(xml_data)
-        imdb_id = None
-        tmdb_id = None
+        ids = {'imdb': None, 'tmdb': None, 'tvdb': None}
         for guid in root.iter('Guid'):
             guid_id = guid.get('id')
             if 'imdb://' in guid_id:
-                imdb_id = guid_id.split('imdb://')[1]
-            elif not imdb_id and 'tmdb://' in guid_id:
-                tmdb_id = guid_id.split('tmdb://')[1]
+                ids['imdb'] = guid_id.split('imdb://')[1]
+            elif 'tmdb://' in guid_id:
+                ids['tmdb'] = guid_id.split('tmdb://')[1]
+            elif 'tvdb://' in guid_id:
+                ids['tvdb'] = guid_id.split('tvdb://')[1]
 
-        if not imdb_id and tmdb_id is not None:
-            imdb_id = self.tmdb.get_imdb_id(tmdb_id)
+        if not ids['imdb'] and ids['tmdb'] is not None and self.tmdb is not None:
+            ids['imdb'] = self.tmdb.get_imdb_id(ids['tmdb'])
 
-        return imdb_id
+        return ids
 
     def _create_symbolic_links(self, matching_items, matching_total):
         logs.info(u"Creating symlinks for {count} matching items in the "
