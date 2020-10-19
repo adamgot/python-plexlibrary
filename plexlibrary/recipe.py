@@ -138,7 +138,7 @@ class Recipe(object):
                      else self.recipe['new_library'].get('max_count', 0))
 
         if debugging:
-            logs.info(u"Checking {count} items for {max} matches".format(count=len(item_list), max=max_count))
+            logs.info(u"Checking {count} items for {max} max allowed matches.".format(count=len(item_list), max=max_count))
         for i, item in enumerate(item_list):
             match = False
             if 0 < max_count <= matching_total:
@@ -216,6 +216,8 @@ class Recipe(object):
                     logs.info(u"{} {} ({})".format(
                         matching_total, item['title'], item['year']))
             else:
+                if debugging:
+                    logs.info(u"No matches found")
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
 
