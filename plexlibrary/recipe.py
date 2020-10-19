@@ -201,8 +201,8 @@ class Recipe(object):
                         tvdb_id = matched_ids['tvdb']
 
                     if ((imdb_id and imdb_id == str(item['id']))
-                            or (tmdb_id and tmdb_id == str(item['tmdb_id']))
-                            or (tvdb_id and tvdb_id == str(item['tvdb_id']))):
+                            or (tmdb_id and item.get('tmdb_id') and tmdb_id == str(item['tmdb_id']))
+                            or (tvdb_id and item.get('tvdb_id') and tvdb_id == str(item['tvdb_id']))):
                         if not match:
                             match = True
                             matching_total += 1
