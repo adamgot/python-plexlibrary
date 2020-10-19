@@ -129,6 +129,7 @@ class Recipe(object):
         return source_libraries
 
     def _get_matching_items(self, source_libraries, item_list):
+        debugging = self.recipe.get('debugging', None) and self.recipe['debugging']['enabled']
         matching_items = []
         missing_items = []
         matching_total = 0
@@ -136,6 +137,8 @@ class Recipe(object):
         max_count = (self.recipe['new_playlist'].get('max_count', 0) if self.use_playlists
                      else self.recipe['new_library'].get('max_count', 0))
 
+        if debugging:
+            logs.info(u"Checking {count} items for {max} matches".format(count=len(item_list), max=max_count))
         for i, item in enumerate(item_list):
             match = False
             if 0 < max_count <= matching_total:
@@ -155,43 +158,55 @@ class Recipe(object):
                     Still no results, fall back to searching by title and 
                     year because the user may be using the new Plex Movie Agent
                     """
+                    if debugging:
+                        logs.info("")
+                        logs.info(u"Using title search: {title} ({year})".format(
+                            title=item['title'], year=item['year']))
                     res = source_library.search(title=item['title'], year=item['year'])
                     if not res:
+                        if debugging:
+                            logs.info(u"trying {year}".format(year=int(item['year']) + 1))
                         res += source_library.search(title=item['title'], year=int(item['year']) + 1)
                     if not res:
+                        if debugging:
+                            logs.info(u"trying {year}".format(year=int(item['year']) - 1))
                         res += source_library.search(title=item['title'], year=int(item['year']) - 1)
 
             if not res:
+                if debugging:
+                    logs.info(u"No matches found")
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
                 continue
+            else:
+                for r in res:
+                    imdb_id = None
+                    tmdb_id = None
+                    tvdb_id = None
+                    if r.guid is not None and 'imdb://' in r.guid:
+                        imdb_id = r.guid.split('imdb://')[1].split('?')[0]
+                    elif r.guid is not None and 'themoviedb://' in r.guid:
+                        tmdb_id = r.guid.split('themoviedb://')[1].split('?')[0]
+                    elif r.guid is not None and 'thetvdb://' in r.guid:
+                        tvdb_id = (r.guid.split('thetvdb://')[1]
+                            .split('?')[0]
+                            .split('/')[0])
+                    elif r.guid is not None and 'plex://' in r.guid:
+                        # FIXME: Temporary workaround until plexapi is updated to include the imdb/tmdb ids
+                        if debugging:
+                            logs.info(u"Matching plex:// to IMDB")
+                        matched_ids = self._get_other_agent_ids_from_plex_movie_agent(r)
+                        imdb_id = matched_ids['imdb']
+                        tmdb_id = matched_ids['tmdb']
+                        tvdb_id = matched_ids['tvdb']
 
-            for r in res:
-                imdb_id = None
-                tmdb_id = None
-                tvdb_id = None
-                if r.guid is not None and 'imdb://' in r.guid:
-                    imdb_id = r.guid.split('imdb://')[1].split('?')[0]
-                elif r.guid is not None and 'themoviedb://' in r.guid:
-                    tmdb_id = r.guid.split('themoviedb://')[1].split('?')[0]
-                elif r.guid is not None and 'thetvdb://' in r.guid:
-                    tvdb_id = (r.guid.split('thetvdb://')[1]
-                        .split('?')[0]
-                        .split('/')[0])
-                elif r.guid is not None and 'plex://' in r.guid:
-                    # FIXME: Temporary workaround until plexapi is updated to include the imdb/tmdb ids
-                    matched_ids = self._get_other_agent_ids_from_plex_movie_agent(r)
-                    imdb_id = matched_ids['imdb']
-                    tmdb_id = matched_ids['tmdb']
-                    tvdb_id = matched_ids['tvdb']
-
-                if ((imdb_id and imdb_id == str(item['id']))
-                        or (tmdb_id and tmdb_id == str(item['tmdb_id']))
-                        or (tvdb_id and tvdb_id == str(item['tvdb_id']))):
-                    if not match:
-                        match = True
-                        matching_total += 1
-                    matching_items.append(r)
+                    if ((imdb_id and imdb_id == str(item['id']))
+                            or (tmdb_id and tmdb_id == str(item['tmdb_id']))
+                            or (tvdb_id and tvdb_id == str(item['tvdb_id']))):
+                        if not match:
+                            match = True
+                            matching_total += 1
+                        matching_items.append(r)
 
             if match:
                 if not self.use_playlists and self.recipe['new_library']['sort_title']['absolute']:

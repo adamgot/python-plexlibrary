@@ -12,3 +12,4 @@ syntax: glob
 .idea/
 config.yml
 recipes/*.yml
+venv/
