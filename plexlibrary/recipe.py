@@ -417,6 +417,7 @@ class Recipe(object):
         # Retrieve a list of items from the new library
         logs.info(u"Retrieving a list of items from the '{library}' library in "
                   u"Plex...".format(library=self.recipe['new_library']['name']))
+
         return new_library, new_library.all()
 
     def _get_imdb_dict(self, media_items, item_ids, force_match=False):
@@ -433,6 +434,11 @@ class Recipe(object):
                 tvdb_id = (m.guid.split('thetvdb://')[1]
                     .split('?')[0]
                     .split('/')[0])
+            elif m.guid is not None and 'plex://' in m.guid:
+                matched_ids = self._get_other_agent_ids_from_plex_movie_agent(m)
+                imdb_id = matched_ids['imdb']
+                tmdb_id = matched_ids['tmdb']
+                tvdb_id = matched_ids['tvdb']
             else:
                 imdb_id = None
 
