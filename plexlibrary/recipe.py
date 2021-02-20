@@ -23,11 +23,48 @@ from recipes import RecipeParser
 from utils import Colors, add_years
 
 
-class Recipe(object):
+class SourceMap():
+    def __init__(self):
+        self.imdb = {}
+        self.tmdb = {}
+        self.tvdb = {}
+
+    def add_item(self, item):
+        if item.guid.startswith('plex'):
+            for guid in item.guids:
+                self._add_id(guid.id, item)
+        else:
+            self._add_id(item.guid, item)
+
+    def _add_id(self, guid, item):
+        try:
+            source, id_ = guid.split('://', 1)
+        except ValueError:
+            logs.warning(f"Unknown guid: {guid}")
+            return
+        id_ = id_.split('?')[0]
+        if 'imdb' in source:
+            if '/' in id_:
+                id_ = id_.split('/')[-2]
+            self.imdb[id_] = item
+        elif 'tmdb' in source or 'themoviedb' in source:
+            self.tmdb[id_] = item
+        elif 'tvdb' in source or 'thetvdb' in source:
+            if '/' in id_:
+                id_ = id_.split('/')[-2]
+            self.tvdb[id_] = item
+        else:
+            logs.warning(f"Unknown guid: {guid}. "
+                         f"Possibly unmatched: {item.title} ({item.year})")
+
+
+class Recipe():
     plex = None
     trakt = None
     tmdb = None
     tvdb = None
+
+    source_map = SourceMap()
 
     def __init__(self, recipe_name, sort_only=False, config_file=None, use_playlists=False):
         self.recipe_name = recipe_name
@@ -118,10 +155,6 @@ class Recipe(object):
                 raise Exception("The '{}' library does not exist".format(
                     library_config['name']))
 
-            # FIXME: Hack until a new plexapi version is released. 3.0.4?
-            if 'guid' not in source_library.ALLOWED_FILTERS:
-                source_library.ALLOWED_FILTERS += ('guid',)
-
             source_libraries.append(source_library)
         return source_libraries
 
@@ -138,59 +171,40 @@ class Recipe(object):
             if 0 < max_count <= matching_total:
                 nonmatching_idx.append(i)
                 continue
-            res = []
-            for source_library in source_libraries:
-                lres = source_library.search(guid='imdb://' + str(item['id']))
-                if not lres and item.get('tmdb_id'):
-                    lres += source_library.search(
-                        guid='themoviedb://' + str(item['tmdb_id']))
-                if not lres and item.get('tvdb_id'):
-                    lres += source_library.search(
-                        guid='thetvdb://' + str(item['tvdb_id']))
-                if lres:
-                    res += lres
+            res = self.source_map.imdb.get(item['id'])
+            if not res and item.get('tmdb_id'):
+                res = self.source_map.tmdb.get(item['tmdb_id'])
+            if not res and item.get('tvdb_id'):
+                res = self.source_map.tmdb.get(item['tvdb_id'])
+
             if not res:
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
                 continue
 
-            for r in res:
-                imdb_id = None
-                tmdb_id = None
-                tvdb_id = None
-                if r.guid is not None and 'imdb://' in r.guid:
-                    imdb_id = r.guid.split('imdb://')[1].split('?')[0]
-                elif r.guid is not None and 'themoviedb://' in r.guid:
-                    tmdb_id = r.guid.split('themoviedb://')[1].split('?')[0]
-                elif r.guid is not None and 'thetvdb://' in r.guid:
-                    tvdb_id = (r.guid.split('thetvdb://')[1]
-                        .split('?')[0]
-                        .split('/')[0])
+            matching_total += 1
+            matching_items += res
 
-                if ((imdb_id and imdb_id == str(item['id']))
-                        or (tmdb_id and tmdb_id == str(item['tmdb_id']))
-                        or (tvdb_id and tvdb_id == str(item['tvdb_id']))):
-                    if not match:
-                        match = True
-                        matching_total += 1
-                    matching_items.append(r)
-
-            if match:
-                if not self.use_playlists and self.recipe['new_library']['sort_title']['absolute']:
-                    logs.info(u"{} {} ({})".format(
-                        i + 1, item['title'], item['year']))
-                else:
-                    logs.info(u"{} {} ({})".format(
-                        matching_total, item['title'], item['year']))
+            if not self.use_playlists and self.recipe['new_library']['sort_title']['absolute']:
+                logs.info(u"{} {} ({})".format(
+                    i + 1, item['title'], item['year']))
             else:
-                missing_items.append((i, item))
-                nonmatching_idx.append(i)
+                logs.info(u"{} {} ({})".format(
+                    matching_total, item['title'], item['year']))
 
         if not self.use_playlists and not self.recipe['new_library']['sort_title']['absolute']:
             for i in reversed(nonmatching_idx):
                 del item_list[i]
 
         return matching_items, missing_items, matching_total, nonmatching_idx, max_count
+
+    def _populate_source_map(self, libraries):
+        for library in libraries:
+            for item in library.all():
+                self.source_map.add_item(item)
+        logs.info(self.source_map.imdb)
+        logs.info(self.source_map.tmdb)
+        logs.info(self.source_map.tvdb)
 
     def _create_symbolic_links(self, matching_items, matching_total):
         logs.info(u"Creating symlinks for {count} matching items in the "
@@ -332,7 +346,7 @@ class Recipe(object):
         try:
             new_library = self.plex.server.library.section(
                 self.recipe['new_library']['name'])
-            logs.warning(u"Library already exists in Plex. Scanning the library...")
+            logs.info(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
         except plexapi.exceptions.NotFound:
@@ -444,6 +458,8 @@ class Recipe(object):
             all_new_items = self._cleanup_new_library(new_library=new_library)
         elif sort_only:
             return True
+        else:
+            all_new_items = new_library.all()
         while imdb_map:
             imdb_id, item = imdb_map.popitem()
             i += 1
@@ -591,9 +607,12 @@ class Recipe(object):
         # Get list of items from the Plex server
         source_libraries = self._get_plex_libraries()
 
+        # Populate source library guid map
+        self._populate_source_map(source_libraries)
+
         # Create a list of matching items
         matching_items, missing_items, matching_total, nonmatching_idx, max_count = self._get_matching_items(
-            source_libraries=source_libraries, item_list=item_list)
+            source_libraries, item_list)
 
         if self.use_playlists:
             # Start playlist process
