@@ -32,9 +32,6 @@ class IdMap():
     def add_libraries(self, libraries):
         for library in libraries:
             self.add_items(library.all())
-        logs.info(self.imdb)
-        logs.info(self.tmdb)
-        logs.info(self.tvdb)
 
     def add_items(self, items):
         for item in items:
