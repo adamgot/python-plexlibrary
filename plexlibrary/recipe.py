@@ -455,11 +455,9 @@ class Recipe():
                 self.recipe['new_library'].get('remove_old', False)):
             # Remove old items that no longer qualify
             self._remove_old_items_from_library(imdb_map=imdb_map)
-            all_new_items = self._cleanup_new_library(new_library=new_library)
         elif sort_only:
             return True
-        else:
-            all_new_items = new_library.all()
+        all_new_items = self._cleanup_new_library(new_library=new_library)
         while imdb_map:
             imdb_id, item = imdb_map.popitem()
             i += 1
