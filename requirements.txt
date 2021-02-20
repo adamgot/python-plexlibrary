@@ -1,5 +1,5 @@
 # pip install -r requirements.txt
-plexapi
+plexapi==4.3.1
 requests
 trakt
 ruamel.yaml
