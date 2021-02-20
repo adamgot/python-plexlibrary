@@ -23,11 +23,22 @@ from recipes import RecipeParser
 from utils import Colors, add_years
 
 
-class SourceMap():
+class IdMap():
     def __init__(self):
         self.imdb = {}
         self.tmdb = {}
         self.tvdb = {}
+
+    def add_libraries(self, libraries):
+        for library in libraries:
+            self.add_items(library.all())
+        logs.info(self.imdb)
+        logs.info(self.tmdb)
+        logs.info(self.tvdb)
+
+    def add_items(self, items):
+        for item in items:
+            self.add_item(item)
 
     def add_item(self, item):
         if item.guid.startswith('plex'):
@@ -64,7 +75,8 @@ class Recipe():
     tmdb = None
     tvdb = None
 
-    source_map = SourceMap()
+    source_map = IdMap()
+    dest_map = IdMap()
 
     def __init__(self, recipe_name, sort_only=False, config_file=None, use_playlists=False):
         self.recipe_name = recipe_name
@@ -197,14 +209,6 @@ class Recipe():
                 del item_list[i]
 
         return matching_items, missing_items, matching_total, nonmatching_idx, max_count
-
-    def _populate_source_map(self, libraries):
-        for library in libraries:
-            for item in library.all():
-                self.source_map.add_item(item)
-        logs.info(self.source_map.imdb)
-        logs.info(self.source_map.tmdb)
-        logs.info(self.source_map.tvdb)
 
     def _create_symbolic_links(self, matching_items, matching_total):
         logs.info(u"Creating symlinks for {count} matching items in the "
@@ -375,56 +379,20 @@ class Recipe():
                   u"Plex...".format(library=self.recipe['new_library']['name']))
         return new_library, new_library.all()
 
-    def _get_imdb_dict(self, media_items, item_ids, force_match=False):
-        imdb_map = {}
-        for m in media_items:
-            imdb_id = None
-            tmdb_id = None
-            tvdb_id = None
-            if m.guid is not None and 'imdb://' in m.guid:
-                imdb_id = m.guid.split('imdb://')[1].split('?')[0]
-            elif m.guid is not None and 'themoviedb://' in m.guid:
-                tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
-            elif m.guid is not None and 'thetvdb://' in m.guid:
-                tvdb_id = (m.guid.split('thetvdb://')[1]
-                    .split('?')[0]
-                    .split('/')[0])
-            else:
-                imdb_id = None
-
-            if imdb_id and str(imdb_id) in item_ids:
-                imdb_map[imdb_id] = m
-            elif tmdb_id and ('tmdb' + str(tmdb_id)) in item_ids:
-                imdb_map['tmdb' + str(tmdb_id)] = m
-            elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
-                imdb_map['tvdb' + str(tvdb_id)] = m
-            elif force_match:
-                # Only IMDB ID found for some items
-                if tmdb_id:
-                    imdb_id = self.tmdb.get_imdb_id(tmdb_id)
-                elif tvdb_id:
-                    imdb_id = self.tvdb.get_imdb_id(tvdb_id)
-                if imdb_id and str(imdb_id) in item_ids:
-                    imdb_map[imdb_id] = m
-                else:
-                    imdb_map[m.ratingKey] = m
-            else:
-                imdb_map[m.ratingKey] = m
-        return imdb_map
-
-    def _modify_sort_titles_and_cleanup(self, item_list, imdb_map, new_library, sort_only=False):
+    def _modify_sort_titles_and_cleanup(self, item_list, new_library,
+                                        sort_only=False):
         if self.recipe['new_library']['sort']:
-            logs.info(u"Setting the sort titles for the '{}' library...".format(
+            logs.info(u"Setting the sort titles for the '{}' library".format(
                 self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
             for i, m in enumerate(item_list):
-                item = imdb_map.pop(m['id'], None)
-                if not item:
-                    item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')),
-                                        None)
-                if not item:
-                    item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
-                                        None)
+                item = self.dest_map.imdb.pop(m['id'], None)
+                if m.get('tmdb_id'):
+                    item = self.dest_map.tmdb.pop(str(m['tmdb_id']), None) \
+                            or item
+                if m.get('tvdb_id'):
+                    item = self.dest_map.tmdb.pop(str(m['tvdb_id']), None) \
+                            or item
                 if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i + 1, m['title'],
@@ -435,15 +403,19 @@ class Recipe():
         else:
             i = 0
             for m in item_list:
-                item = imdb_map.pop(m['id'], None)
-                if not item:
-                    item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')),
-                                        None)
-                if not item:
-                    item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
-                                        None)
+                i += 1
+                # TODO: Refactor to get rid of this duplicated code
+                item = self.dest_map.imdb.pop(m['id'], None)
+                if m.get('tmdb_id'):
+                    item = self.dest_map.tmdb.pop(str(m['tmdb_id']), None) \
+                            or item
+                if m.get('tvdb_id'):
+                    item = self.dest_map.tmdb.pop(str(m['tvdb_id']), None) \
+                            or item
+                unmatched_items = list(set(list(self.dest_map.imdb.values()) +
+                                           list(self.dest_map.tmdb.values()) +
+                                           list(self.dest_map.tvdb.values())))
                 if item and self.recipe['new_library']['sort']:
-                    i += 1
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i, m['title'],
                         self.library_type,
@@ -454,22 +426,23 @@ class Recipe():
                 self.recipe['new_library']['remove_from_library'] or
                 self.recipe['new_library'].get('remove_old', False)):
             # Remove old items that no longer qualify
-            self._remove_old_items_from_library(imdb_map=imdb_map)
+            self._remove_old_items_from_library(unmatched_items)
         elif sort_only:
             return True
         all_new_items = self._cleanup_new_library(new_library=new_library)
-        while imdb_map:
-            imdb_id, item = imdb_map.popitem()
-            i += 1
-            logs.info(u"{} {} ({})".format(i, item.title, item.year))
-            self.plex.set_sort_title(
-                new_library.key, item.ratingKey, i, item.title,
-                self.library_type,
-                self.recipe['new_library']['sort_title']['format'],
-                self.recipe['new_library']['sort_title']['visible'])
+        if self.recipe['new_library']['sort']:
+            while unmatched_items:
+                item = unmatched_items.pop()
+                i += 1
+                logs.info(u"{} {} ({})".format(i, item.title, item.year))
+                self.plex.set_sort_title(
+                    new_library.key, item.ratingKey, i, item.title,
+                    self.library_type,
+                    self.recipe['new_library']['sort_title']['format'],
+                    self.recipe['new_library']['sort_title']['visible'])
         return all_new_items
 
-    def _remove_old_items_from_library(self, imdb_map):
+    def _remove_old_items_from_library(self, unmatched_items):
         logs.info(u"Removing symlinks for items "
                   "which no longer qualify ".format(library=self.recipe['new_library']['name']))
         count = 0
@@ -478,8 +451,7 @@ class Recipe():
         max_date = add_years(
             (self.recipe['new_library']['max_age'] or 0) * -1)
         if self.library_type == 'movie':
-            exclude = []
-            for mid, movie in imdb_map.items():
+            for movie in unmatched_items:
                 if not self.recipe['new_library']['remove_from_library']:
                     # Only remove older than max_age
                     if not self.recipe['new_library']['max_age'] \
@@ -525,10 +497,8 @@ class Recipe():
                         except Exception as e:
                             logs.error(u"Remove symlink failed for "
                                        "{path}: {e}".format(path=new_path, e=e))
-            for mid in exclude:
-                imdb_map.pop(mid, None)
         else:
-            for tv_show in imdb_map.values():
+            for tv_show in unmatched_items:
                 done = False
                 if done:
                     continue
@@ -606,7 +576,7 @@ class Recipe():
         source_libraries = self._get_plex_libraries()
 
         # Populate source library guid map
-        self._populate_source_map(source_libraries)
+        self.source_map.add_libraries(source_libraries)
 
         # Create a list of matching items
         matching_items, missing_items, matching_total, nonmatching_idx, max_count = self._get_matching_items(
@@ -638,12 +608,10 @@ class Recipe():
             logs.info(u"Creating the '{}' library in Plex...".format(
                 self.recipe['new_library']['name']))
             new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=True)
-            # Create a dictionary of {imdb_id: item}
-            imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids,
-                                           force_match=force_imdb_id_match)
+            self.dest_map.add_items(all_new_items)
             # Modify the sort titles
-            all_new_items = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map,
-                                                                 new_library=new_library, sort_only=False)
+            all_new_items = self._modify_sort_titles_and_cleanup(
+                    item_list, new_library, sort_only=False)
             return missing_items, len(all_new_items)
 
     def _run_sort_only(self):
@@ -652,11 +620,10 @@ class Recipe():
 
         # Get existing library and its items
         new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=False)
-        # Create a dictionary of {imdb_id: item}
-        imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids, force_match=force_imdb_id_match)
+        self.dest_map.add_items(all_new_items)
         # Modify the sort titles
-        _ = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library,
-                                                 sort_only=True)
+        self._modify_sort_titles_and_cleanup(item_list, new_library,
+                                             sort_only=True)
         return len(all_new_items)
 
     def run(self, sort_only=False, share_playlist_to_all=False):
