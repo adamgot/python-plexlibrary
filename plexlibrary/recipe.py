@@ -173,9 +173,9 @@ class Recipe():
                 continue
             res = self.source_map.imdb.get(item['id'])
             if not res and item.get('tmdb_id'):
-                res = self.source_map.tmdb.get(item['tmdb_id'])
+                res = self.source_map.tmdb.get(str(item['tmdb_id']))
             if not res and item.get('tvdb_id'):
-                res = self.source_map.tmdb.get(item['tvdb_id'])
+                res = self.source_map.tmdb.get(str(item['tvdb_id']))
 
             if not res:
                 missing_items.append((i, item))
