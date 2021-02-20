@@ -14,7 +14,8 @@ accordingly (sort only available for libraries).
 Known limitations
 -----------------
 
-The new Plex Movie agent is not currently supported.
+The new Plex Movie agent is not currently supported. 
+There is a working "beta" branch called plex-movie-agent that supports it.
 
 Disclaimer
 ----------
