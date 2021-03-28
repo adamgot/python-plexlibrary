@@ -409,9 +409,6 @@ class Recipe():
                 if m.get('tvdb_id'):
                     item = self.dest_map.tmdb.pop(str(m['tvdb_id']), None) \
                             or item
-                unmatched_items = list(set(list(self.dest_map.imdb.values()) +
-                                           list(self.dest_map.tmdb.values()) +
-                                           list(self.dest_map.tvdb.values())))
                 if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i, m['title'],
@@ -419,6 +416,9 @@ class Recipe():
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible']
                     )
+        unmatched_items = list(set(list(self.dest_map.imdb.values()) +
+                                   list(self.dest_map.tmdb.values()) +
+                                   list(self.dest_map.tvdb.values())))
         if not sort_only and (
                 self.recipe['new_library']['remove_from_library'] or
                 self.recipe['new_library'].get('remove_old', False)):
@@ -426,8 +426,7 @@ class Recipe():
             self._remove_old_items_from_library(unmatched_items)
         elif sort_only:
             return True
-        all_new_items = self._cleanup_new_library(new_library=new_library)
-        if self.recipe['new_library']['sort']:
+        elif self.recipe['new_library']['sort']:
             while unmatched_items:
                 item = unmatched_items.pop()
                 i += 1
@@ -437,6 +436,7 @@ class Recipe():
                     self.library_type,
                     self.recipe['new_library']['sort_title']['format'],
                     self.recipe['new_library']['sort_title']['visible'])
+        all_new_items = self._cleanup_new_library(new_library=new_library)
         return all_new_items
 
     def _remove_old_items_from_library(self, unmatched_items):
