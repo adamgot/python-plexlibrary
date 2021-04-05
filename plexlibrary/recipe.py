@@ -378,7 +378,7 @@ class Recipe():
 
         logs.info(u"Created symlinks for {count} new items:".format(count=count))
         for item in new_items:
-            logs.info(u"{title} ({year})".format(title=item.title, year=item.year))
+            logs.info(u"{title} ({year})".format(title=item.title, year=getattr(item, 'year', None)))
 
     def _verify_new_library_and_get_items(self, create_if_not_found=False):
         # Check if the new library exists in Plex
