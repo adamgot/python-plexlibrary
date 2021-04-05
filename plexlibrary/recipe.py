@@ -25,6 +25,7 @@ from utils import Colors, add_years
 
 class IdMap():
     def __init__(self):
+        self.items = set()
         self.imdb = {}
         self.tmdb = {}
         self.tvdb = {}
@@ -44,12 +45,42 @@ class IdMap():
         else:
             self._add_id(item.guid, item)
 
+    def get(self, imdb=None, tmdb=None, tvdb=None):
+        item = None
+        if imdb:
+            item = self.imdb.get(imdb)
+        if not item and tmdb:
+            item = self.tmdb.get(tmdb)
+        if not item and tvdb:
+            item = self.tvdb.get(tvdb)
+        return item if item in self.items else None
+
+    def pop_item(self, item):
+        return self.pop(item=item)
+
+    def pop(self, imdb=None, tmdb=None, tvdb=None, item=None):
+        if imdb:
+            item = self.imdb.pop(imdb, None)
+        if not item and tmdb:
+            item = self.tmdb.pop(tmdb, None)
+        if not item and tvdb:
+            item = self.tvdb.pop(tvdb, None)
+        if not item:
+            return None
+        self._popall(item)
+        try:
+            self.items.remove(item)
+        except KeyError:
+            log.warning("Item didn't exist in map set, collision?")
+        return item
+
     def _add_id(self, guid, item):
         try:
             source, id_ = guid.split('://', 1)
         except ValueError:
             logs.warning(f"Unknown guid: {guid}")
             return
+        self.items.add(item)
         id_ = id_.split('?')[0]
         if 'imdb' in source:
             if '/' in id_:
@@ -64,6 +95,17 @@ class IdMap():
         else:
             logs.warning(f"Unknown guid: {guid}. "
                          f"Possibly unmatched: {item.title} ({item.year})")
+
+    def _popall(self, item):
+        items = []
+        for d in (self.imdb, self.tmdb, self.tvdb):
+            keys = []
+            for k, v in d.items():
+                if v is item:
+                    keys.append(k)
+            for k in keys:
+                items.append(d.pop(k))
+        return items
 
 
 class Recipe():
@@ -176,15 +218,11 @@ class Recipe():
                      else self.recipe['new_library'].get('max_count', 0))
 
         for i, item in enumerate(item_list):
-            match = False
             if 0 < max_count <= matching_total:
                 nonmatching_idx.append(i)
                 continue
-            res = self.source_map.imdb.get(item['id'])
-            if not res and item.get('tmdb_id'):
-                res = self.source_map.tmdb.get(str(item['tmdb_id']))
-            if not res and item.get('tvdb_id'):
-                res = self.source_map.tmdb.get(str(item['tvdb_id']))
+            res = self.source_map.get(item.get('id'), item.get('tmdb_id'),
+                                      item.get('tvdb_id'))
 
             if not res:
                 missing_items.append((i, item))
@@ -383,13 +421,7 @@ class Recipe():
                 self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
             for i, m in enumerate(item_list):
-                item = self.dest_map.imdb.pop(m['id'], None)
-                if m.get('tmdb_id'):
-                    item = self.dest_map.tmdb.pop(str(m['tmdb_id']), None) \
-                            or item
-                if m.get('tvdb_id'):
-                    item = self.dest_map.tmdb.pop(str(m['tvdb_id']), None) \
-                            or item
+                item = self.dest_map.pop(m.get('id'), m.get('tmdb_id'), m.get('tvdb_id'))
                 if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i + 1, m['title'],
@@ -401,14 +433,7 @@ class Recipe():
             i = 0
             for m in item_list:
                 i += 1
-                # TODO: Refactor to get rid of this duplicated code
-                item = self.dest_map.imdb.pop(m['id'], None)
-                if m.get('tmdb_id'):
-                    item = self.dest_map.tmdb.pop(str(m['tmdb_id']), None) \
-                            or item
-                if m.get('tvdb_id'):
-                    item = self.dest_map.tmdb.pop(str(m['tvdb_id']), None) \
-                            or item
+                item = self.dest_map.pop(m.get('id'), m.get('tmdb_id'), m.get('tvdb_id'))
                 if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i, m['title'],
@@ -416,9 +441,7 @@ class Recipe():
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible']
                     )
-        unmatched_items = list(set(list(self.dest_map.imdb.values()) +
-                                   list(self.dest_map.tmdb.values()) +
-                                   list(self.dest_map.tvdb.values())))
+        unmatched_items = list(self.dest_map.items)
         if not sort_only and (
                 self.recipe['new_library']['remove_from_library'] or
                 self.recipe['new_library'].get('remove_old', False)):
