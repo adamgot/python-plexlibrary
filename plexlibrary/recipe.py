@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import logs
+import shelve
 
 import plexapi
 
@@ -24,24 +25,35 @@ from utils import Colors, add_years
 
 
 class IdMap():
-    def __init__(self):
+    def __init__(self, matching_only=False, cache_file=None,
+                 match_imdb=None, match_tmdb=None, match_tvdb=None):
         self.items = set()
         self.imdb = {}
         self.tmdb = {}
         self.tvdb = {}
+        self.matching_only = matching_only
+        if cache_file:
+            self.cache_file = cache_file
+        else:
+            self.cache_file = 'plex_guid_cache.shelve'
+        if matching_only:
+            self.match_imdb = match_imdb or []
+            self.match_tmdb = match_tmdb or []
+            self.match_tvdb = match_tvdb or []
 
     def add_libraries(self, libraries):
         for library in libraries:
             self.add_items(library.all())
 
     def add_items(self, items):
-        for item in items:
-            self.add_item(item)
+        while items:
+            self.add_item(items.pop(0))  # Pop to save on memory
 
     def add_item(self, item):
         if item.guid.startswith('plex'):
-            for guid in item.guids:
-                self._add_id(guid.id, item)
+            guids = self._get_guids(item)
+            for guid in guids:
+                self._add_id(guid, item)
         else:
             self._add_id(item.guid, item)
 
@@ -74,27 +86,51 @@ class IdMap():
             log.warning("Item didn't exist in map set, collision?")
         return item
 
+    def _get_guids(self, item):
+        cache = shelve.open(self.cache_file)
+        guids = []
+        try:
+            if item.guid in cache:
+                    guids = cache[item.guid]
+        except (EOFError, UnpicklingError):
+            # Cache file error, clear
+            log.warning("GUID cache file error, clearing cache")
+            cache.close()
+            cache = shelve.open(self.cache_file, 'n')
+        if not guids:
+            guids = [guid.id for guid in item.guids]
+            if guids:
+                cache[item.guid] = guids
+        cache.close()
+        return guids
+
     def _add_id(self, guid, item):
         try:
             source, id_ = guid.split('://', 1)
         except ValueError:
             logs.warning(f"Unknown guid: {guid}")
             return
-        self.items.add(item)
         id_ = id_.split('?')[0]
         if 'imdb' in source:
             if '/' in id_:
                 id_ = id_.split('/')[-2]
+            if self.matching_only and not id_ in self.match_imdb:
+                return
             self.imdb[id_] = item
         elif 'tmdb' in source or 'themoviedb' in source:
+            if self.matching_only and not id_ in self.match_tmdb:
+                return
             self.tmdb[id_] = item
         elif 'tvdb' in source or 'thetvdb' in source:
             if '/' in id_:
                 id_ = id_.split('/')[-2]
+            if self.matching_only and not id_ in self.match_tvdb:
+                return
             self.tvdb[id_] = item
         else:
             logs.warning(f"Unknown guid: {guid}. "
                          f"Possibly unmatched: {item.title} ({item.year})")
+        self.items.add(item)
 
     def _popall(self, item):
         items = []
@@ -113,9 +149,6 @@ class Recipe():
     trakt = None
     tmdb = None
     tvdb = None
-
-    source_map = IdMap()
-    dest_map = IdMap()
 
     def __init__(self, recipe_name, sort_only=False, config_file=None, use_playlists=False):
         self.recipe_name = recipe_name
@@ -164,6 +197,11 @@ class Recipe():
                                      self.config['tvdb']['user_key'])
 
         self.imdb = imdbutils.IMDb(self.tmdb, self.tvdb)
+
+        self.source_map = IdMap(matching_only=True,
+                                cache_file=self.config.get('guid_cache_file'))
+        self.dest_map = IdMap(cache_file=self.config.get('guid_cache_file'))
+
 
 
     def _get_trakt_lists(self):
@@ -596,6 +634,13 @@ class Recipe():
         source_libraries = self._get_plex_libraries()
 
         # Populate source library guid map
+        for item in item_list:
+            if item.get('id'):
+                self.source_map.match_imdb.append(item['id'])
+            if item.get('tmdb_id'):
+                self.source_map.match_tmdb.append(item['tmdb_id'])
+            if item.get('tvdb_id'):
+                self.source_map.match_tvdb.append(item['tvdb_id'])
         self.source_map.add_libraries(source_libraries)
 
         # Create a list of matching items
