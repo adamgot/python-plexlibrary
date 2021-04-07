@@ -11,6 +11,10 @@ import sys
 import time
 import logs
 import shelve
+try:
+    from cPickle import UnpicklingError
+except ImportError:
+    from pickle import UnpicklingError
 
 import plexapi
 
@@ -36,6 +40,9 @@ class IdMap():
             self.cache_file = cache_file
         else:
             self.cache_file = 'plex_guid_cache.shelve'
+        self.cache = None
+        self.cache_section = None
+        self.cache_section_id = None
         if matching_only:
             self.match_imdb = match_imdb or []
             self.match_tmdb = match_tmdb or []
@@ -83,26 +90,58 @@ class IdMap():
         try:
             self.items.remove(item)
         except KeyError:
-            log.warning("Item didn't exist in map set, collision?")
+            logs.warning("Item didn't exist in map set, collision?")
         return item
 
     def _get_guids(self, item):
-        cache = shelve.open(self.cache_file)
+        self._load_cache(item.librarySectionID)
         guids = []
+        ts = item.updatedAt.timestamp()
         try:
-            if item.guid in cache:
-                    guids = cache[item.guid]
+            if (item.guid in self.cache and
+                    self.cache[item.guid]['updatedAt'] == ts):
+                guids = self.cache[item.guid]['guids']
         except (EOFError, UnpicklingError):
             # Cache file error, clear
-            log.warning("GUID cache file error, clearing cache")
-            cache.close()
-            cache = shelve.open(self.cache_file, 'n')
+            logs.warning("GUID cache file error, clearing cache")
+            self._clear_cache()
+        except (KeyError, TypeError):
+            logs.warning("Cache error, overwriting")
+            guids = self.cache[item.guid]
+            self.cache[item.guid] = {
+                'guids': guids,
+                'updatedAt': ts
+            }
+            self._save_cache()
         if not guids:
             guids = [guid.id for guid in item.guids]
             if guids:
-                cache[item.guid] = guids
-        cache.close()
+                self.cache[item.guid] = {
+                    'guids': guids,
+                    'updatedAt': ts
+                }
+                self._save_cache()
+        self._close_cache()
         return guids
+
+    def _load_cache(self, section_id):
+        self._cache = shelve.open(self.cache_file)
+        if not self.cache or self.cache_section_id != section_id:
+            self.cache = self._cache.get(section_id)
+        self.cache_section_id = section_id
+        if not self.cache:
+            self._cache[section_id] = dict()
+            self.cache = self._cache[section_id]
+
+    def _save_cache(self):
+        self._cache[self.cache_section_id] = self.cache
+
+    def _clear_cache(self):
+        self._cache.close()
+        self._cache = shelve.open(self.cache_file, 'n')
+
+    def _close_cache(self):
+        self._cache.close()
 
     def _add_id(self, guid, item):
         try:
