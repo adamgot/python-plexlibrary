@@ -94,7 +94,7 @@ class IdMap():
         return item
 
     def _get_guids(self, item):
-        self._load_cache(item.librarySectionID)
+        self._load_cache(str(item.librarySectionID))
         guids = []
         ts = item.updatedAt.timestamp()
         try:
