@@ -96,10 +96,15 @@ class IdMap():
     def _get_guids(self, item):
         self._load_cache(str(item.librarySectionID))
         guids = []
-        ts = item.updatedAt.timestamp()
+        try:
+            ts = item.updatedAt.timestamp()
+        except AttributeError:
+            logs.warning("Missing updatedAt timestamp for {} ({})".format(
+                item.title, item.year))
+            ts = 0
         try:
             if (item.guid in self.cache and
-                    self.cache[item.guid]['updatedAt'] == ts):
+                    self.cache[item.guid]['updatedAt'] >= ts):
                 guids = self.cache[item.guid]['guids']
         except (EOFError, UnpicklingError):
             # Cache file error, clear
