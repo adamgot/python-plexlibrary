@@ -10,11 +10,7 @@ import subprocess
 import sys
 import time
 import logs
-import shelve
-try:
-    from cPickle import UnpicklingError
-except ImportError:
-    from pickle import UnpicklingError
+import json
 
 import plexapi
 
@@ -39,7 +35,7 @@ class IdMap():
         if cache_file:
             self.cache_file = cache_file
         else:
-            self.cache_file = 'plex_guid_cache.shelve'
+            self.cache_file = 'plex_guid_cache.json'
         self.cache = None
         self.cache_section = None
         self.cache_section_id = None
@@ -106,10 +102,6 @@ class IdMap():
             if (item.guid in self.cache and
                     self.cache[item.guid]['updatedAt'] >= ts):
                 guids = self.cache[item.guid]['guids']
-        except (EOFError, UnpicklingError):
-            # Cache file error, clear
-            logs.warning("GUID cache file error, clearing cache")
-            self._clear_cache()
         except (KeyError, TypeError):
             logs.warning("Cache error, overwriting")
             guids = self.cache[item.guid]
@@ -126,27 +118,24 @@ class IdMap():
                     'updatedAt': ts
                 }
                 self._save_cache()
-        self._close_cache()
         return guids
 
     def _load_cache(self, section_id):
-        self._cache = shelve.open(self.cache_file)
-        if not self.cache or self.cache_section_id != section_id:
-            self.cache = self._cache.get(section_id)
+        if self.cache and self.cache_section_id == section_id:
+            return
+        if not os.path.isfile(self.cache_file):
+            with open(self.cache_file, 'w') as f:
+                json.dump(dict(), f)
+        with open(self.cache_file, 'r') as f:
+            self._cache = json.load(f)
+        self.cache = self._cache.get(section_id, dict())
+
         self.cache_section_id = section_id
-        if not self.cache:
-            self._cache[section_id] = dict()
-            self.cache = self._cache[section_id]
 
     def _save_cache(self):
         self._cache[self.cache_section_id] = self.cache
-
-    def _clear_cache(self):
-        self._cache.close()
-        self._cache = shelve.open(self.cache_file, 'n')
-
-    def _close_cache(self):
-        self._cache.close()
+        with open(self.cache_file, 'w') as f:
+            json.dump(self._cache, f)
 
     def _add_id(self, guid, item):
         try:
