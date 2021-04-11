@@ -127,7 +127,11 @@ class IdMap():
             with open(self.cache_file, 'w') as f:
                 json.dump(dict(), f)
         with open(self.cache_file, 'r') as f:
-            self._cache = json.load(f)
+            try:
+                self._cache = json.load(f)
+            except Exception as e:
+                logs.warning("Unable to read cache, recreating ({})".format(e))
+                self._cache = dict()
         self.cache = self._cache.get(section_id, dict())
 
         self.cache_section_id = section_id
