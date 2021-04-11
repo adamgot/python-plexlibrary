@@ -1,3 +1,5 @@
+guid_cache_file: '/tmp/plex_guid_cache.json'
+
 # Plex server details
 # * Defaults to plexapi config
 plex:

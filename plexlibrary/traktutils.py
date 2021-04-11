@@ -97,7 +97,7 @@ class Trakt(object):
                 continue
             movie_list.append({
                 'id': m['movie']['ids']['imdb'],
-                'tmdb_id': m['movie']['ids'].get('tmdb', ''),
+                'tmdb_id': str(m['movie']['ids'].get('tmdb', '')),
                 'title': m['movie']['title'],
                 'year': m['movie']['year'],
             })
@@ -132,8 +132,8 @@ class Trakt(object):
                 continue
             show_list.append({
                 'id': m['show']['ids']['imdb'],
-                'tmdb_id': m['show']['ids'].get('tmdb', ''),
-                'tvdb_id': m['show']['ids'].get('tvdb', ''),
+                'tmdb_id': str(m['show']['ids'].get('tmdb', '')),
+                'tvdb_id': str(m['show']['ids'].get('tvdb', '')),
                 'title': m['show']['title'],
                 'year': m['show']['year'],
             })
