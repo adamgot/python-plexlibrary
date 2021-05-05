@@ -9,6 +9,8 @@ except ImportError:
 
 import requests
 
+import logs
+
 
 class TMDb(object):
     api_key = None
@@ -42,7 +44,7 @@ class TMDb(object):
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
-            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            logs.info(u"Waiting 10 seconds for the TMDb rate limit...")
             time.sleep(10)
             self.request_count = 0
 
@@ -82,6 +84,11 @@ class TMDb(object):
                 # Cache file error, clear
                 cache.close()
                 cache = shelve.open(self.cache_file, 'n')
+            except:
+                # Unknown cache file error, clear
+                logs.error(u"Error in loading cache: {}".format(e))
+                cache.close()
+                cache = shelve.open(self.cache_file, 'n')
             else:
                 if (cache_item['cached'] + 3600 * 24) > int(time.time()):
                     cache.close()
@@ -89,7 +96,7 @@ class TMDb(object):
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
-            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            logs.info(u"Waiting 10 seconds for the TMDb rate limit...")
             time.sleep(10)
             self.request_count = 0
 
@@ -137,7 +144,7 @@ class TMDb(object):
 
         # Wait 10 seconds for the TMDb rate limit
         if self.request_count >= 40:
-            print(u"Waiting 10 seconds for the TMDb rate limit...")
+            logs.info(u"Waiting 10 seconds for the TMDb rate limit...")
             time.sleep(10)
             self.request_count = 0
 

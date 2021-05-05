@@ -2,11 +2,11 @@ Python-PlexLibrary
 ==================
 
 Python command line utility for creating and maintaining dynamic Plex
-libraries based on "recipes".
+libraries and playlists based on "recipes".
 
-E.g. Create a library consisting of all movies or tv shows in a Trakt_ list or
+E.g. Create a library or playlist consisting of all movies or tv shows in a Trakt_ list or
 on an IMDb_ chart that exist in your main library, and set the sort titles
-accordingly.
+accordingly (sort only available for libraries).
 
 **!!IMPOTANT!!**
 
@@ -17,8 +17,23 @@ Make sure to clone this repo to **/opt/appdata/** or else the scripts will not w
 .. _Trakt: https://trakt.tv/
 .. _IMDb: https://imdb.com/
 
+
+=======
+Known limitations
+-----------------
+
+The new Plex Movie agent is not currently supported. 
+There is a working "beta" branch called plex-movie-agent that supports it.
+
+Disclaimer
+----------
+This is still a work in progress, so major changes may occur in new versions.
+
+
 Requirements
 ------------
+
+* Python 3
 
 * You need a trakt.tv account and an API app: https://trakt.tv/oauth/applications/new
 
@@ -88,7 +103,8 @@ To run a recipe named "movies_trending", run:
 .. code-block:: shell
 
     python3 plexlibrary movies_trending
-    
+
+
 Custom Python Plexlibrary Recipes
 ---------------------------------
 I have added my current recipes I have made for Python Plexlibrary using some of Porkie16 lists.
@@ -121,6 +137,8 @@ Then add this line to the bottom of the file.
 .. code-block:: shell
 
     @weekly bash /opt/appdata/python-plexlibrary/plexlibrary.sh >/dev/null 2>&1
+=======
+
     
 save and exit with **ctrl+o** & **ctrl+x**.
 

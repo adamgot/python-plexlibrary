@@ -42,6 +42,12 @@ def main():
         help='list available recipes')
     parser.add_argument(
         '-s', '--sort-only', action='store_true', help='only sort the library')
+    parser.add_argument(
+        '-p', '--playlists', action='store_true', help='make playlists rather than libraries'
+    )
+    parser.add_argument(
+        '-e', '--everyone', action='store_true', help='share playlist with all users (overrides settings in recipe)'
+    )
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -57,8 +63,8 @@ def main():
         list_recipes()
         sys.exit(1)
 
-    r = Recipe(args.recipe)
-    r.run(args.sort_only)
+    r = Recipe(recipe_name=args.recipe, use_playlists=args.playlists)
+    r.run(sort_only=args.sort_only, share_playlist_to_all=args.everyone)
 
     print("Done!")
 
