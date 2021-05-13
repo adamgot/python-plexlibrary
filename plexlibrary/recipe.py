@@ -524,9 +524,11 @@ class Recipe():
             self._remove_old_items_from_library(unmatched_items)
         elif sort_only:
             return True
-        elif self.recipe['new_library']['sort']:
+        if self.recipe['new_library']['sort'] and \
+                not self.recipe['new_library']['remove_from_library']:
+            unmatched_items.sort(key=lambda x: x.titleSort)
             while unmatched_items:
-                item = unmatched_items.pop()
+                item = unmatched_items.pop(0)
                 i += 1
                 logs.info(u"{} {} ({})".format(i, item.title, item.year))
                 self.plex.set_sort_title(
