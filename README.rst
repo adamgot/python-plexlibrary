@@ -11,11 +11,6 @@ accordingly (sort only available for libraries).
 .. _Trakt: https://trakt.tv/
 .. _IMDb: https://imdb.com/
 
-Known limitations
------------------
-
-The new Plex Movie agent is not currently supported. 
-There is a working "beta" branch called plex-movie-agent that supports it.
 
 Disclaimer
 ----------
