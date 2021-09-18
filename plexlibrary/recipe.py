@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import logs
+import json
 
 import plexapi
 
@@ -23,7 +24,164 @@ from recipes import RecipeParser
 from utils import Colors, add_years
 
 
-class Recipe(object):
+class IdMap():
+    def __init__(self, matching_only=False, cache_file=None,
+                 match_imdb=None, match_tmdb=None, match_tvdb=None):
+        self.items = set()
+        self.imdb = {}
+        self.tmdb = {}
+        self.tvdb = {}
+        self.matching_only = matching_only
+        if cache_file:
+            self.cache_file = cache_file
+        else:
+            self.cache_file = 'plex_guid_cache.json'
+        self.cache = None
+        self.cache_section = None
+        self.cache_section_id = None
+        if matching_only:
+            self.match_imdb = match_imdb or []
+            self.match_tmdb = match_tmdb or []
+            self.match_tvdb = match_tvdb or []
+
+    def add_libraries(self, libraries):
+        for library in libraries:
+            self.add_items(library.all())
+
+    def add_items(self, items):
+        while items:
+            self.add_item(items.pop(0))  # Pop to save on memory
+
+    def add_item(self, item):
+        if item.guid.startswith('plex'):
+            guids = self._get_guids(item)
+            for guid in guids:
+                self._add_id(guid, item)
+        else:
+            self._add_id(item.guid, item)
+
+    def get(self, imdb=None, tmdb=None, tvdb=None):
+        item = None
+        if imdb:
+            item = self.imdb.get(imdb)
+        if not item and tmdb:
+            item = self.tmdb.get(tmdb)
+        if not item and tvdb:
+            item = self.tvdb.get(tvdb)
+        return item if item in self.items else None
+
+    def pop_item(self, item):
+        return self.pop(item=item)
+
+    def pop(self, imdb=None, tmdb=None, tvdb=None, item=None):
+        if imdb:
+            item = self.imdb.pop(imdb, None)
+        if not item and tmdb:
+            item = self.tmdb.pop(tmdb, None)
+        if not item and tvdb:
+            item = self.tvdb.pop(tvdb, None)
+        if not item:
+            return None
+        self._popall(item)
+        try:
+            self.items.remove(item)
+        except KeyError:
+            logs.warning("Item didn't exist in map set, collision?")
+        return item
+
+    def _get_guids(self, item):
+        self._load_cache(str(item.librarySectionID))
+        guids = []
+        try:
+            ts = item.updatedAt.timestamp()
+        except AttributeError:
+            logs.warning("Missing updatedAt timestamp for {} ({})".format(
+                item.title, item.year))
+            ts = 0
+        try:
+            if (item.guid in self.cache and
+                    self.cache[item.guid]['updatedAt'] >= ts):
+                guids = self.cache[item.guid]['guids']
+        except (KeyError, TypeError):
+            logs.warning("Cache error, overwriting")
+            guids = self.cache[item.guid]
+            self.cache[item.guid] = {
+                'guids': guids,
+                'updatedAt': ts
+            }
+            self._save_cache()
+        if not guids:
+            guids = [guid.id for guid in item.guids]
+            if guids:
+                self.cache[item.guid] = {
+                    'guids': guids,
+                    'updatedAt': ts
+                }
+                self._save_cache()
+        return guids
+
+    def _load_cache(self, section_id):
+        if self.cache and self.cache_section_id == section_id:
+            return
+        if not os.path.isfile(self.cache_file):
+            with open(self.cache_file, 'w') as f:
+                json.dump(dict(), f)
+        with open(self.cache_file, 'r') as f:
+            try:
+                self._cache = json.load(f)
+            except Exception as e:
+                logs.warning("Unable to read cache, recreating ({})".format(e))
+                self._cache = dict()
+        self.cache = self._cache.get(section_id, dict())
+
+        self.cache_section_id = section_id
+
+    def _save_cache(self):
+        self._cache[self.cache_section_id] = self.cache
+        with open(self.cache_file, 'w') as f:
+            json.dump(self._cache, f)
+
+    def _add_id(self, guid, item):
+        try:
+            source, id_ = guid.split('://', 1)
+        except ValueError:
+            logs.warning(f"Unknown guid: {guid}")
+            return
+        id_ = id_.split('?')[0]
+        if 'imdb' in source:
+            if '/' in id_:
+                id_ = id_.split('/')[-2]
+            if self.matching_only and not id_ in self.match_imdb:
+                return
+            self.imdb[id_] = item
+        elif 'tmdb' in source or 'themoviedb' in source:
+            if self.matching_only and not id_ in self.match_tmdb:
+                return
+            self.tmdb[id_] = item
+        elif 'tvdb' in source or 'thetvdb' in source:
+            if '/' in id_:
+                id_ = id_.split('/')[-2]
+            if self.matching_only and not id_ in self.match_tvdb:
+                return
+            self.tvdb[id_] = item
+        else:
+            logs.warning(f"Unknown guid: {guid}. "
+                         f"Possibly unmatched: {item.title} ({item.year})")
+        self.items.add(item)
+
+    def _popall(self, item):
+        items = []
+        for d in (self.imdb, self.tmdb, self.tvdb):
+            keys = []
+            for k, v in d.items():
+                if v is item:
+                    keys.append(k)
+            for k in keys:
+                items.append(d.pop(k))
+        return items
+
+
+class Recipe():
     plex = None
     trakt = None
     tmdb = None
@@ -77,6 +235,11 @@ class Recipe(object):
 
         self.imdb = imdbutils.IMDb(self.tmdb, self.tvdb)
 
+        self.source_map = IdMap(matching_only=True,
+                                cache_file=self.config.get('guid_cache_file'))
+        self.dest_map = IdMap(cache_file=self.config.get('guid_cache_file'))
+
+
 
     def _get_trakt_lists(self):
         item_list = []  # TODO Replace with dict, scrap item_ids?
@@ -118,10 +281,6 @@ class Recipe(object):
                 raise Exception("The '{}' library does not exist".format(
                     library_config['name']))
 
-            # FIXME: Hack until a new plexapi version is released. 3.0.4?
-            if 'guid' not in source_library.ALLOWED_FILTERS:
-                source_library.ALLOWED_FILTERS += ('guid',)
-
             source_libraries.append(source_library)
         return source_libraries
 
@@ -134,57 +293,26 @@ class Recipe(object):
                      else self.recipe['new_library'].get('max_count', 0))
 
         for i, item in enumerate(item_list):
-            match = False
             if 0 < max_count <= matching_total:
                 nonmatching_idx.append(i)
                 continue
-            res = []
-            for source_library in source_libraries:
-                lres = source_library.search(guid='imdb://' + str(item['id']))
-                if not lres and item.get('tmdb_id'):
-                    lres += source_library.search(
-                        guid='themoviedb://' + str(item['tmdb_id']))
-                if not lres and item.get('tvdb_id'):
-                    lres += source_library.search(
-                        guid='thetvdb://' + str(item['tvdb_id']))
-                if lres:
-                    res += lres
+            res = self.source_map.get(item.get('id'), item.get('tmdb_id'),
+                                      item.get('tvdb_id'))
+
             if not res:
                 missing_items.append((i, item))
                 nonmatching_idx.append(i)
                 continue
 
-            for r in res:
-                imdb_id = None
-                tmdb_id = None
-                tvdb_id = None
-                if r.guid is not None and 'imdb://' in r.guid:
-                    imdb_id = r.guid.split('imdb://')[1].split('?')[0]
-                elif r.guid is not None and 'themoviedb://' in r.guid:
-                    tmdb_id = r.guid.split('themoviedb://')[1].split('?')[0]
-                elif r.guid is not None and 'thetvdb://' in r.guid:
-                    tvdb_id = (r.guid.split('thetvdb://')[1]
-                        .split('?')[0]
-                        .split('/')[0])
+            matching_total += 1
+            matching_items += res
 
-                if ((imdb_id and imdb_id == str(item['id']))
-                        or (tmdb_id and tmdb_id == str(item['tmdb_id']))
-                        or (tvdb_id and tvdb_id == str(item['tvdb_id']))):
-                    if not match:
-                        match = True
-                        matching_total += 1
-                    matching_items.append(r)
-
-            if match:
-                if not self.use_playlists and self.recipe['new_library']['sort_title']['absolute']:
-                    logs.info(u"{} {} ({})".format(
-                        i + 1, item['title'], item['year']))
-                else:
-                    logs.info(u"{} {} ({})".format(
-                        matching_total, item['title'], item['year']))
+            if not self.use_playlists and self.recipe['new_library']['sort_title']['absolute']:
+                logs.info(u"{} {} ({})".format(
+                    i + 1, item['title'], item['year']))
             else:
-                missing_items.append((i, item))
-                nonmatching_idx.append(i)
+                logs.info(u"{} {} ({})".format(
+                    matching_total, item['title'], item['year']))
 
         if not self.use_playlists and not self.recipe['new_library']['sort_title']['absolute']:
             for i in reversed(nonmatching_idx):
@@ -325,14 +453,14 @@ class Recipe(object):
 
         logs.info(u"Created symlinks for {count} new items:".format(count=count))
         for item in new_items:
-            logs.info(u"{title} ({year})".format(title=item.title, year=item.year))
+            logs.info(u"{title} ({year})".format(title=item.title, year=getattr(item, 'year', None)))
 
     def _verify_new_library_and_get_items(self, create_if_not_found=False):
         # Check if the new library exists in Plex
         try:
             new_library = self.plex.server.library.section(
                 self.recipe['new_library']['name'])
-            logs.warning(u"Library already exists in Plex. Scanning the library...")
+            logs.info(u"Library already exists in Plex. Scanning the library...")
 
             new_library.update()
         except plexapi.exceptions.NotFound:
@@ -361,56 +489,14 @@ class Recipe(object):
                   u"Plex...".format(library=self.recipe['new_library']['name']))
         return new_library, new_library.all()
 
-    def _get_imdb_dict(self, media_items, item_ids, force_match=False):
-        imdb_map = {}
-        for m in media_items:
-            imdb_id = None
-            tmdb_id = None
-            tvdb_id = None
-            if m.guid is not None and 'imdb://' in m.guid:
-                imdb_id = m.guid.split('imdb://')[1].split('?')[0]
-            elif m.guid is not None and 'themoviedb://' in m.guid:
-                tmdb_id = m.guid.split('themoviedb://')[1].split('?')[0]
-            elif m.guid is not None and 'thetvdb://' in m.guid:
-                tvdb_id = (m.guid.split('thetvdb://')[1]
-                    .split('?')[0]
-                    .split('/')[0])
-            else:
-                imdb_id = None
-
-            if imdb_id and str(imdb_id) in item_ids:
-                imdb_map[imdb_id] = m
-            elif tmdb_id and ('tmdb' + str(tmdb_id)) in item_ids:
-                imdb_map['tmdb' + str(tmdb_id)] = m
-            elif tvdb_id and ('tvdb' + str(tvdb_id)) in item_ids:
-                imdb_map['tvdb' + str(tvdb_id)] = m
-            elif force_match:
-                # Only IMDB ID found for some items
-                if tmdb_id:
-                    imdb_id = self.tmdb.get_imdb_id(tmdb_id)
-                elif tvdb_id:
-                    imdb_id = self.tvdb.get_imdb_id(tvdb_id)
-                if imdb_id and str(imdb_id) in item_ids:
-                    imdb_map[imdb_id] = m
-                else:
-                    imdb_map[m.ratingKey] = m
-            else:
-                imdb_map[m.ratingKey] = m
-        return imdb_map
-
-    def _modify_sort_titles_and_cleanup(self, item_list, imdb_map, new_library, sort_only=False):
+    def _modify_sort_titles_and_cleanup(self, item_list, new_library,
+                                        sort_only=False):
         if self.recipe['new_library']['sort']:
-            logs.info(u"Setting the sort titles for the '{}' library...".format(
+            logs.info(u"Setting the sort titles for the '{}' library".format(
                 self.recipe['new_library']['name']))
         if self.recipe['new_library']['sort_title']['absolute']:
             for i, m in enumerate(item_list):
-                item = imdb_map.pop(m['id'], None)
-                if not item:
-                    item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')),
-                                        None)
-                if not item:
-                    item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
-                                        None)
+                item = self.dest_map.pop(m.get('id'), m.get('tmdb_id'), m.get('tvdb_id'))
                 if item and self.recipe['new_library']['sort']:
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i + 1, m['title'],
@@ -421,41 +507,39 @@ class Recipe(object):
         else:
             i = 0
             for m in item_list:
-                item = imdb_map.pop(m['id'], None)
-                if not item:
-                    item = imdb_map.pop('tmdb' + str(m.get('tmdb_id', '')),
-                                        None)
-                if not item:
-                    item = imdb_map.pop('tvdb' + str(m.get('tvdb_id', '')),
-                                        None)
+                i += 1
+                item = self.dest_map.pop(m.get('id'), m.get('tmdb_id'), m.get('tvdb_id'))
                 if item and self.recipe['new_library']['sort']:
-                    i += 1
                     self.plex.set_sort_title(
                         new_library.key, item.ratingKey, i, m['title'],
                         self.library_type,
                         self.recipe['new_library']['sort_title']['format'],
                         self.recipe['new_library']['sort_title']['visible']
                     )
+        unmatched_items = list(self.dest_map.items)
         if not sort_only and (
                 self.recipe['new_library']['remove_from_library'] or
                 self.recipe['new_library'].get('remove_old', False)):
             # Remove old items that no longer qualify
-            self._remove_old_items_from_library(imdb_map=imdb_map)
+            self._remove_old_items_from_library(unmatched_items)
         elif sort_only:
             return True
+        if self.recipe['new_library']['sort'] and \
+                not self.recipe['new_library']['remove_from_library']:
+            unmatched_items.sort(key=lambda x: x.titleSort)
+            while unmatched_items:
+                item = unmatched_items.pop(0)
+                i += 1
+                logs.info(u"{} {} ({})".format(i, item.title, item.year))
+                self.plex.set_sort_title(
+                    new_library.key, item.ratingKey, i, item.title,
+                    self.library_type,
+                    self.recipe['new_library']['sort_title']['format'],
+                    self.recipe['new_library']['sort_title']['visible'])
         all_new_items = self._cleanup_new_library(new_library=new_library)
-        while imdb_map:
-            imdb_id, item = imdb_map.popitem()
-            i += 1
-            logs.info(u"{} {} ({})".format(i, item.title, item.year))
-            self.plex.set_sort_title(
-                new_library.key, item.ratingKey, i, item.title,
-                self.library_type,
-                self.recipe['new_library']['sort_title']['format'],
-                self.recipe['new_library']['sort_title']['visible'])
         return all_new_items
 
-    def _remove_old_items_from_library(self, imdb_map):
+    def _remove_old_items_from_library(self, unmatched_items):
         logs.info(u"Removing symlinks for items "
                   "which no longer qualify ".format(library=self.recipe['new_library']['name']))
         count = 0
@@ -464,8 +548,7 @@ class Recipe(object):
         max_date = add_years(
             (self.recipe['new_library']['max_age'] or 0) * -1)
         if self.library_type == 'movie':
-            exclude = []
-            for mid, movie in imdb_map.items():
+            for movie in unmatched_items:
                 if not self.recipe['new_library']['remove_from_library']:
                     # Only remove older than max_age
                     if not self.recipe['new_library']['max_age'] \
@@ -511,10 +594,8 @@ class Recipe(object):
                         except Exception as e:
                             logs.error(u"Remove symlink failed for "
                                        "{path}: {e}".format(path=new_path, e=e))
-            for mid in exclude:
-                imdb_map.pop(mid, None)
         else:
-            for tv_show in imdb_map.values():
+            for tv_show in unmatched_items:
                 done = False
                 if done:
                     continue
@@ -591,9 +672,19 @@ class Recipe(object):
         # Get list of items from the Plex server
         source_libraries = self._get_plex_libraries()
 
+        # Populate source library guid map
+        for item in item_list:
+            if item.get('id'):
+                self.source_map.match_imdb.append(item['id'])
+            if item.get('tmdb_id'):
+                self.source_map.match_tmdb.append(item['tmdb_id'])
+            if item.get('tvdb_id'):
+                self.source_map.match_tvdb.append(item['tvdb_id'])
+        self.source_map.add_libraries(source_libraries)
+
         # Create a list of matching items
         matching_items, missing_items, matching_total, nonmatching_idx, max_count = self._get_matching_items(
-            source_libraries=source_libraries, item_list=item_list)
+            source_libraries, item_list)
 
         if self.use_playlists:
             # Start playlist process
@@ -621,12 +712,10 @@ class Recipe(object):
             logs.info(u"Creating the '{}' library in Plex...".format(
                 self.recipe['new_library']['name']))
             new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=True)
-            # Create a dictionary of {imdb_id: item}
-            imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids,
-                                           force_match=force_imdb_id_match)
+            self.dest_map.add_items(all_new_items)
             # Modify the sort titles
-            all_new_items = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map,
-                                                                 new_library=new_library, sort_only=False)
+            all_new_items = self._modify_sort_titles_and_cleanup(
+                    item_list, new_library, sort_only=False)
             return missing_items, len(all_new_items)
 
     def _run_sort_only(self):
@@ -635,11 +724,10 @@ class Recipe(object):
 
         # Get existing library and its items
         new_library, all_new_items = self._verify_new_library_and_get_items(create_if_not_found=False)
-        # Create a dictionary of {imdb_id: item}
-        imdb_map = self._get_imdb_dict(media_items=all_new_items, item_ids=item_ids, force_match=force_imdb_id_match)
+        self.dest_map.add_items(all_new_items)
         # Modify the sort titles
-        _ = self._modify_sort_titles_and_cleanup(item_list=item_list, imdb_map=imdb_map, new_library=new_library,
-                                                 sort_only=True)
+        self._modify_sort_titles_and_cleanup(item_list, new_library,
+                                             sort_only=True)
         return len(all_new_items)
 
     def run(self, sort_only=False, share_playlist_to_all=False):
